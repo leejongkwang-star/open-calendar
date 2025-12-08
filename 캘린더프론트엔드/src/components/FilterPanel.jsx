@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import { getMockMembers } from '../utils/mockData'
+import { EVENT_TYPE_OPTIONS, toKoreanEventType } from '../utils/eventTypeMapping'
 
 function FilterPanel({ filters, onFiltersChange, onClose }) {
   const handleMemberToggle = (memberId) => {
@@ -19,7 +20,7 @@ function FilterPanel({ filters, onFiltersChange, onClose }) {
   const resetFilters = () => {
     onFiltersChange({
       members: [],
-      eventTypes: ['휴가', '회의', '기타'],
+      eventTypes: ['VACATION', 'MEETING', 'OTHER'],
     })
   }
 
@@ -27,7 +28,8 @@ function FilterPanel({ filters, onFiltersChange, onClose }) {
   const mockMembers = getMockMembers()
   const members = mockMembers.map((m) => ({ id: m.id, name: m.name }))
 
-  const eventTypes = ['휴가', '회의', '기타']
+  // 이벤트 타입은 영문 값 사용
+  const eventTypes = ['VACATION', 'MEETING', 'OTHER']
 
   return (
     <div className="card mb-6">
@@ -76,7 +78,7 @@ function FilterPanel({ filters, onFiltersChange, onClose }) {
                   onChange={() => handleEventTypeToggle(type)}
                   className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                 />
-                <span className="ml-2 text-sm text-gray-700">{type}</span>
+                <span className="ml-2 text-sm text-gray-700">{toKoreanEventType(type)}</span>
               </label>
             ))}
           </div>

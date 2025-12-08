@@ -1,0 +1,136 @@
+import express from 'express'
+import cors from 'cors'
+import dotenv from 'dotenv'
+import { PrismaClient } from '@prisma/client'
+import authRoutes from './routes/auth.js'
+import eventsRoutes from './routes/events.js'
+import teamsRoutes from './routes/teams.js'
+import { errorHandler } from './middleware/errorHandler.js'
+
+// 환경 변수 로드
+dotenv.config()
+
+const app = express()
+const PORT = process.env.PORT || 3001
+
+// Prisma 클라이언트 초기화
+export const prisma = new PrismaClient()
+
+// 미들웨어
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  credentials: true,
+}))
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
+
+// 로깅 미들웨어
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`)
+  next()
+})
+
+// 헬스 체크
+app.get('/health', (req, res) => {
+  // Accept 헤더에 따라 JSON 또는 HTML 응답
+  if (req.headers.accept && req.headers.accept.includes('text/html')) {
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="ko">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>서버 상태 확인</title>
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          }
+          .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            text-align: center;
+            max-width: 500px;
+          }
+          .status {
+            color: #10b981;
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+          }
+          .timestamp {
+            color: #6b7280;
+            font-size: 0.9rem;
+            margin-top: 1rem;
+          }
+          .json-link {
+            margin-top: 1.5rem;
+            display: inline-block;
+            color: #667eea;
+            text-decoration: none;
+            font-size: 0.9rem;
+          }
+          .json-link:hover {
+            text-decoration: underline;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="status">✓ 서버가 정상 작동 중입니다</div>
+          <div class="timestamp">확인 시간: ${new Date().toLocaleString('ko-KR')}</div>
+          <a href="/health?format=json" class="json-link">JSON 형식으로 보기</a>
+        </div>
+      </body>
+      </html>
+    `)
+  } else {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() })
+  }
+})
+
+// API 라우트
+app.use('/api/auth', authRoutes)
+app.use('/api/events', eventsRoutes)
+app.use('/api/teams', teamsRoutes)
+
+// 404 핸들러
+app.use((req, res) => {
+  res.status(404).json({ message: '요청한 리소스를 찾을 수 없습니다.' })
+})
+
+// 에러 핸들러
+app.use(errorHandler)
+
+// 서버 시작
+const server = app.listen(PORT, () => {
+  console.log(`🚀 서버가 http://localhost:${PORT}에서 실행 중입니다.`)
+  console.log(`📊 환경: ${process.env.NODE_ENV || 'development'}`)
+})
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM 신호를 받았습니다. 서버를 종료합니다...')
+  await prisma.$disconnect()
+  server.close(() => {
+    console.log('서버가 종료되었습니다.')
+    process.exit(0)
+  })
+})
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT 신호를 받았습니다. 서버를 종료합니다...')
+  await prisma.$disconnect()
+  server.close(() => {
+    console.log('서버가 종료되었습니다.')
+    process.exit(0)
+  })
+})
+

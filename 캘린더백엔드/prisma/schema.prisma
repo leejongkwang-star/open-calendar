@@ -1,0 +1,125 @@
+// Prisma 스키마 파일
+// https://www.prisma.io/docs/concepts/components/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 사용자 모델
+model User {
+  id              Int       @id @default(autoincrement())
+  employeeNumber  String    @unique @db.VarChar(6)
+  password        String
+  name            String
+  role            UserRole  @default(MEMBER)
+  status          UserStatus @default(PENDING)
+  rejectionReason String?
+  approvedAt      DateTime?
+  approvedBy      Int?
+  approvedByUser  User?     @relation("ApprovedUsers", fields: [approvedBy], references: [id])
+  approvedUsers   User[]    @relation("ApprovedUsers")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // 관계
+  teams           TeamMember[]
+  events          Event[]
+  createdTeams    Team[]    @relation("TeamCreator")
+
+  @@index([employeeNumber])
+  @@index([status])
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  MEMBER
+}
+
+enum UserStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// 팀 모델
+model Team {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String?
+  createdBy   Int
+  creator     User      @relation("TeamCreator", fields: [createdBy], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // 관계
+  members     TeamMember[]
+  events      Event[]
+
+  @@map("teams")
+}
+
+// 팀 구성원 모델
+model TeamMember {
+  id            Int       @id @default(autoincrement())
+  teamId        Int
+  userId        Int
+  position      String?
+  phone         String?
+  profileImageUrl String?
+  role          TeamRole  @default(MEMBER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // 관계
+  team          Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+  @@map("team_members")
+}
+
+enum TeamRole {
+  ADMIN
+  MEMBER
+}
+
+// 이벤트 모델
+model Event {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String?
+  startDate   DateTime
+  endDate     DateTime
+  startTime   DateTime?
+  endTime     DateTime?
+  eventType   EventType
+  userId      Int
+  teamId      Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // 관계
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team        Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([teamId])
+  @@index([startDate])
+  @@index([endDate])
+  @@map("events")
+}
+
+enum EventType {
+  VACATION  // 휴가
+  MEETING   // 회의
+  OTHER     // 기타
+}
+

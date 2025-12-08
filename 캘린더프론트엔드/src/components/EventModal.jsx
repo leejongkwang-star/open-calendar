@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { X, Trash2, Calendar, Clock, FileText, Users } from 'lucide-react'
+import { toEnglishEventType, toKoreanEventType, EVENT_TYPE_OPTIONS } from '../utils/eventTypeMapping'
 
 function EventModal({ event, onClose, onSave, onDelete, currentUser }) {
   const [formData, setFormData] = useState({
@@ -8,7 +9,7 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser }) {
     endDate: '',
     startTime: '',
     endTime: '',
-    eventType: '휴가',
+    eventType: 'VACATION',
     description: '',
   })
 
@@ -18,13 +19,14 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser }) {
     if (event) {
       const start = event.start || new Date()
       const end = event.end || new Date()
+      // 백엔드에서 받은 영문 값을 그대로 사용 (이미 변환됨)
       setFormData({
         title: event.title || '',
         startDate: formatDate(start),
         endDate: formatDate(end),
         startTime: event.startTime || '',
         endTime: event.endTime || '',
-        eventType: event.eventType || '휴가',
+        eventType: event.eventType || 'VACATION',
         description: event.description || '',
       })
     }
@@ -140,9 +142,11 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser }) {
               className="input-field"
               required
             >
-              <option value="휴가">휴가</option>
-              <option value="회의">회의</option>
-              <option value="기타">기타</option>
+              {EVENT_TYPE_OPTIONS.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           </div>
 

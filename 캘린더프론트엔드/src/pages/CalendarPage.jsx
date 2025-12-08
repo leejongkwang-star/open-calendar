@@ -9,6 +9,7 @@ import { eventsAPI } from '../api/events'
 import { getMockEvents, saveMockEvent, deleteMockEvent, loadMockData } from '../utils/mockData'
 import EventModal from '../components/EventModal'
 import FilterPanel from '../components/FilterPanel'
+import { toKoreanEventType } from '../utils/eventTypeMapping'
 
 // moment를 사용한 로컬라이저
 moment.locale('ko')
@@ -24,7 +25,7 @@ function CalendarPage() {
   const [showFilter, setShowFilter] = useState(false)
   const [filters, setFilters] = useState({
     members: [],
-    eventTypes: ['휴가', '회의', '기타'],
+    eventTypes: ['VACATION', 'MEETING', 'OTHER'],
   })
 
   // 필터링된 이벤트
@@ -136,19 +137,19 @@ function CalendarPage() {
   // 이벤트 스타일 - 가시성 개선
   const eventStyleGetter = (event) => {
     const colors = {
-      휴가: {
+      VACATION: {
         backgroundColor: '#2563eb',
         borderColor: '#1e40af',
         color: '#ffffff',
         fontWeight: '600',
       },
-      회의: {
+      MEETING: {
         backgroundColor: '#059669',
         borderColor: '#047857',
         color: '#ffffff',
         fontWeight: '600',
       },
-      기타: {
+      OTHER: {
         backgroundColor: '#7c3aed',
         borderColor: '#6d28d9',
         color: '#ffffff',
