@@ -12,16 +12,18 @@ const api = axios.create({
 // 요청 인터셉터: 토큰 추가
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('auth-storage')
-    if (token) {
-      try {
-        const authData = JSON.parse(token)
-        if (authData.state?.token) {
+    try {
+      // Zustand persist 스토리지에서 토큰 가져오기
+      const authStorage = localStorage.getItem('auth-storage')
+      if (authStorage) {
+        const authData = JSON.parse(authStorage)
+        // Zustand persist 형식: { state: { token, user, ... }, version: ... }
+        if (authData?.state?.token) {
           config.headers.Authorization = `Bearer ${authData.state.token}`
         }
-      } catch (e) {
-        console.error('토큰 파싱 오류:', e)
       }
+    } catch (e) {
+      console.error('토큰 파싱 오류:', e)
     }
     return config
   },

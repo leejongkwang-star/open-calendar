@@ -1,6 +1,7 @@
 // 에러 핸들링 미들웨어
 export const errorHandler = (err, req, res, next) => {
   console.error('에러 발생:', err)
+  console.error('에러 스택:', err.stack)
 
   // Prisma 에러 처리
   if (err.code === 'P2002') {

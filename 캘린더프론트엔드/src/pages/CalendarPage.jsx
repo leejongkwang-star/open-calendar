@@ -129,7 +129,14 @@ function CalendarPage() {
       setSelectedEvent(null)
     } catch (error) {
       console.error('이벤트 저장 실패:', error)
-      alert(error.response?.data?.message || '이벤트 저장에 실패했습니다.')
+      const errorMessage = error.response?.data?.message || error.message || '이벤트 저장에 실패했습니다.'
+      alert(errorMessage)
+      // 인증 오류인 경우 로그인 페이지로 리다이렉트
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        setTimeout(() => {
+          window.location.href = '/login'
+        }, 2000)
+      }
     }
   }
 

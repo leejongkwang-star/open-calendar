@@ -149,6 +149,14 @@ router.post(
         })
       }
 
+      // JWT_SECRET 확인
+      if (!process.env.JWT_SECRET) {
+        console.error('JWT_SECRET이 설정되지 않았습니다.')
+        return res.status(500).json({ 
+          message: '서버 설정 오류가 발생했습니다. JWT_SECRET을 확인하세요.' 
+        })
+      }
+
       // JWT 토큰 생성
       const token = jwt.sign(
         { userId: user.id, employeeNumber: user.employeeNumber },
@@ -166,6 +174,8 @@ router.post(
         token,
       })
     } catch (error) {
+      console.error('로그인 오류:', error)
+      console.error('오류 스택:', error.stack)
       next(error)
     }
   }

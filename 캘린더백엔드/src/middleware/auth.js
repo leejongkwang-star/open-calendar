@@ -11,6 +11,12 @@ export const authenticate = async (req, res, next) => {
     }
 
     const token = authHeader.substring(7)
+    
+    if (!process.env.JWT_SECRET) {
+      console.error('JWT_SECRET이 설정되지 않았습니다.')
+      return res.status(500).json({ message: '서버 설정 오류가 발생했습니다.' })
+    }
+    
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
     
     // 사용자 정보 조회
@@ -44,7 +50,11 @@ export const authenticate = async (req, res, next) => {
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({ message: '토큰이 만료되었습니다.' })
     }
-    return res.status(500).json({ message: '인증 처리 중 오류가 발생했습니다.' })
+    console.error('인증 오류:', error)
+    return res.status(500).json({ 
+      message: '인증 처리 중 오류가 발생했습니다.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    })
   }
 }
 
