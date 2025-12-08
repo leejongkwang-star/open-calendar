@@ -1,14 +1,20 @@
 -- Supabase 데이터베이스 스키마 마이그레이션
 -- 이 파일을 Supabase SQL Editor에서 실행하세요
 
+-- 0. Enum 타입 생성 (Prisma와 호환성을 위해)
+CREATE TYPE "UserRole" AS ENUM ('ADMIN', 'MEMBER');
+CREATE TYPE "UserStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
+CREATE TYPE "TeamRole" AS ENUM ('ADMIN', 'MEMBER');
+CREATE TYPE "EventType" AS ENUM ('VACATION', 'MEETING', 'OTHER');
+
 -- 1. 사용자 테이블 생성
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     "employeeNumber" VARCHAR(6) UNIQUE NOT NULL,
     password TEXT NOT NULL,
     name VARCHAR(255) NOT NULL,
-    role VARCHAR(10) NOT NULL DEFAULT 'MEMBER' CHECK (role IN ('ADMIN', 'MEMBER')),
-    status VARCHAR(10) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
+    role "UserRole" NOT NULL DEFAULT 'MEMBER',
+    status "UserStatus" NOT NULL DEFAULT 'PENDING',
     "rejectionReason" TEXT,
     "approvedAt" TIMESTAMP,
     "approvedBy" INTEGER,
@@ -44,7 +50,7 @@ CREATE TABLE IF NOT EXISTS team_members (
     position VARCHAR(255),
     phone VARCHAR(50),
     "profileImageUrl" TEXT,
-    role VARCHAR(10) NOT NULL DEFAULT 'MEMBER' CHECK (role IN ('ADMIN', 'MEMBER')),
+    role "TeamRole" NOT NULL DEFAULT 'MEMBER',
     "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
     "updatedAt" TIMESTAMP NOT NULL DEFAULT NOW(),
     CONSTRAINT fk_team_members_team FOREIGN KEY ("teamId") REFERENCES teams(id) ON DELETE CASCADE,
@@ -65,7 +71,7 @@ CREATE TABLE IF NOT EXISTS events (
     "endDate" TIMESTAMP NOT NULL,
     "startTime" TIMESTAMP,
     "endTime" TIMESTAMP,
-    "eventType" VARCHAR(10) NOT NULL CHECK ("eventType" IN ('VACATION', 'MEETING', 'OTHER')),
+    "eventType" "EventType" NOT NULL,
     "userId" INTEGER NOT NULL,
     "teamId" INTEGER NOT NULL,
     "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),

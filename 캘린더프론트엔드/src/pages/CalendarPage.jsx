@@ -6,6 +6,7 @@ import 'react-big-calendar/lib/css/react-big-calendar.css'
 import { Plus, Filter } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { eventsAPI } from '../api/events'
+import { teamsAPI } from '../api/teams'
 import { getMockEvents, saveMockEvent, deleteMockEvent, loadMockData } from '../utils/mockData'
 import EventModal from '../components/EventModal'
 import FilterPanel from '../components/FilterPanel'
@@ -18,6 +19,8 @@ const localizer = momentLocalizer(moment)
 function CalendarPage() {
   const { user } = useAuthStore()
   const [events, setEvents] = useState([])
+  const [teams, setTeams] = useState([])
+  const [selectedTeamId, setSelectedTeamId] = useState(null)
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [view, setView] = useState('month')
   const [showEventModal, setShowEventModal] = useState(false)
@@ -55,18 +58,58 @@ function CalendarPage() {
 
   useEffect(() => {
     loadMockData()
-    loadEvents()
+    loadTeams()
   }, [])
+
+  useEffect(() => {
+    if (selectedTeamId || teams.length > 0) {
+      loadEvents()
+    }
+  }, [selectedTeamId, teams])
+
+  // 팀 목록 로드
+  const loadTeams = async () => {
+    try {
+      const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
+      
+      if (USE_MOCK) {
+        // 모크 모드: 로컬 스토리지 사용
+        const mockTeams = JSON.parse(localStorage.getItem('mockTeams') || '[]')
+        setTeams(mockTeams)
+        if (mockTeams.length > 0 && !selectedTeamId) {
+          setSelectedTeamId(mockTeams[0].id)
+        }
+      } else {
+        // 실제 API 호출
+        const data = await teamsAPI.getTeams()
+        setTeams(data)
+        if (data.length > 0 && !selectedTeamId) {
+          setSelectedTeamId(data[0].id)
+        }
+      }
+    } catch (error) {
+      console.error('팀 로드 실패:', error)
+    }
+  }
 
   // 이벤트 저장 핸들러
   const handleSaveEvent = async (eventData) => {
     try {
       const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
       
+      // teamId 설정 (이벤트에 teamId가 없으면 현재 선택된 팀 사용)
+      const teamId = eventData.teamId || selectedEvent?.teamId || selectedTeamId
+      
+      if (!teamId && !USE_MOCK) {
+        alert('팀을 선택해주세요.')
+        return
+      }
+      
       if (USE_MOCK) {
         // 모크 모드: 로컬 스토리지 사용
         const event = {
           ...eventData,
+          teamId: teamId || 1,
           start: new Date(eventData.startDate + (eventData.startTime ? 'T' + eventData.startTime : '')),
           end: new Date(eventData.endDate + (eventData.endTime ? 'T' + eventData.endTime : '')),
         }
@@ -76,7 +119,7 @@ function CalendarPage() {
         if (selectedEvent?.id) {
           await eventsAPI.updateEvent(selectedEvent.id, eventData)
         } else {
-          await eventsAPI.createEvent(eventData)
+          await eventsAPI.createEvent({ ...eventData, teamId })
         }
       }
       
@@ -86,7 +129,7 @@ function CalendarPage() {
       setSelectedEvent(null)
     } catch (error) {
       console.error('이벤트 저장 실패:', error)
-      alert('이벤트 저장에 실패했습니다.')
+      alert(error.response?.data?.message || '이벤트 저장에 실패했습니다.')
     }
   }
 
@@ -122,9 +165,16 @@ function CalendarPage() {
         const mockEvents = getMockEvents()
         setEvents(mockEvents)
       } else {
-        // 실제 API 호출 (나중에 팀 선택 및 날짜 범위 추가 필요)
-        const data = await eventsAPI.getEvents(null, null, null)
-        setEvents(data)
+        // 실제 API 호출
+        const teamId = selectedTeamId || (teams.length > 0 ? teams[0].id : null)
+        const data = await eventsAPI.getEvents(teamId, null, null)
+        // 날짜 형식 변환 (백엔드에서 Date 객체로 받음)
+        const formattedEvents = data.map(event => ({
+          ...event,
+          start: new Date(event.start),
+          end: new Date(event.end),
+        }))
+        setEvents(formattedEvents)
       }
     } catch (error) {
       console.error('이벤트 로드 실패:', error)

@@ -260,7 +260,7 @@ router.put(
     body('title').optional().trim().notEmpty().withMessage('제목을 입력해주세요.'),
     body('startDate').optional().isISO8601().withMessage('시작일은 유효한 날짜 형식이어야 합니다.'),
     body('endDate').optional().isISO8601().withMessage('종료일은 유효한 날짜 형식이어야 합니다.'),
-    body('eventType').optional().isIn(['휴가', '회의', '기타']).withMessage('일정 유형이 올바르지 않습니다.'),
+    body('eventType').optional().isIn(['VACATION', 'MEETING', 'OTHER']).withMessage('일정 유형이 올바르지 않습니다.'),
   ],
   async (req, res, next) => {
     try {
