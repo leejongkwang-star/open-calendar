@@ -41,7 +41,7 @@ function Layout() {
                 <Calendar className="w-4 h-4 mr-2" />
                 캘린더
               </Link>
-              {user?.role === 'admin' && (
+              {user?.role && user.role.toUpperCase() === 'ADMIN' && (
                 <Link
                   to="/admin"
                   className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -96,7 +96,7 @@ function Layout() {
                 <Calendar className="w-4 h-4 inline mr-2" />
                 캘린더
               </Link>
-              {user?.role === 'admin' && (
+              {user?.role && user.role.toUpperCase() === 'ADMIN' && (
                 <Link
                   to="/admin"
                   className={`block px-3 py-2 rounded-md text-base font-medium ${

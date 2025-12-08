@@ -14,7 +14,31 @@ const app = express()
 const PORT = process.env.PORT || 3001
 
 // Prisma 클라이언트 초기화
-export const prisma = new PrismaClient()
+// Supabase Pooler 모드 호환성을 위한 설정
+const databaseUrl = process.env.DATABASE_URL
+
+// DATABASE_URL에 Supabase Pooler 모드 호환 파라미터 추가
+let finalDatabaseUrl = databaseUrl
+if (databaseUrl && databaseUrl.includes('pooler.supabase.com')) {
+  const separator = databaseUrl.includes('?') ? '&' : '?'
+  // connection_limit=1: 각 연결당 하나의 prepared statement만 사용
+  // pool_timeout=0: 타임아웃 없음
+  // pgbouncer=true: PgBouncer 모드 활성화 (Supabase Pooler와 호환)
+  if (!databaseUrl.includes('connection_limit')) {
+    finalDatabaseUrl = `${databaseUrl}${separator}connection_limit=1&pool_timeout=0&pgbouncer=true`
+  } else if (!databaseUrl.includes('pgbouncer')) {
+    finalDatabaseUrl = `${databaseUrl}&pgbouncer=true`
+  }
+}
+
+export const prisma = new PrismaClient({
+  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+  datasources: {
+    db: {
+      url: finalDatabaseUrl,
+    },
+  },
+})
 
 // 미들웨어
 app.use(cors({

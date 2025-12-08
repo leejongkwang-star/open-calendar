@@ -20,7 +20,8 @@ export const authenticate = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
     
     // 사용자 정보 조회
-    const user = await prisma.user.findUnique({
+    // Supabase Pooler 모드 호환성을 위해 findFirst 사용
+    const user = await prisma.user.findFirst({
       where: { id: decoded.userId },
       select: {
         id: true,

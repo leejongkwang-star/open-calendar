@@ -28,11 +28,44 @@ router.get('/check-employee-number', async (req, res, next) => {
       return res.status(400).json({ message: '직원번호는 영문과 숫자를 모두 포함해야 합니다.' })
     }
 
-    const user = await prisma.user.findUnique({
+    // Supabase Pooler 모드 호환성을 위해 findFirst 사용
+    const user = await prisma.user.findFirst({
       where: { employeeNumber: employeeNumber.toUpperCase() },
     })
 
     res.json({ exists: !!user })
+  } catch (error) {
+    next(error)
+  }
+})
+
+// 직원번호로 사용자 조회 (관리자)
+router.get('/user-by-employee-number', authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const { employeeNumber } = req.query
+
+    if (!employeeNumber) {
+      return res.status(400).json({ message: '직원번호를 입력해주세요.' })
+    }
+
+    // Supabase Pooler 모드 호환성을 위해 findFirst 사용
+    const user = await prisma.user.findFirst({
+      where: { employeeNumber: employeeNumber.toUpperCase() },
+      select: {
+        id: true,
+        employeeNumber: true,
+        name: true,
+        role: true,
+        status: true,
+        createdAt: true,
+      },
+    })
+
+    if (!user) {
+      return res.status(404).json({ message: '해당 직원번호를 가진 사용자를 찾을 수 없습니다.' })
+    }
+
+    res.json(user)
   } catch (error) {
     next(error)
   }
@@ -318,6 +351,152 @@ router.post(
     }
   }
 )
+
+// 전체 회원 목록 조회 (관리자)
+router.get('/users', authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const { status, role, search } = req.query
+
+    const where = {}
+    if (status) {
+      where.status = status
+    }
+    if (role) {
+      where.role = role
+    }
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { employeeNumber: { contains: search.toUpperCase(), mode: 'insensitive' } },
+      ]
+    }
+
+    const users = await prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        employeeNumber: true,
+        name: true,
+        role: true,
+        status: true,
+        createdAt: true,
+        approvedAt: true,
+        approvedBy: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    res.json(users)
+  } catch (error) {
+    next(error)
+  }
+})
+
+// 회원 정보 수정 (관리자)
+router.put(
+  '/users/:userId',
+  authenticate,
+  requireAdmin,
+  [
+    body('name').optional().trim().isLength({ min: 2 }).withMessage('이름은 2자 이상이어야 합니다.'),
+    body('role').optional().isIn(['ADMIN', 'MEMBER']).withMessage('권한이 올바르지 않습니다.'),
+    body('status').optional().isIn(['PENDING', 'APPROVED', 'REJECTED']).withMessage('상태가 올바르지 않습니다.'),
+  ],
+  async (req, res, next) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ message: errors.array()[0].msg })
+      }
+
+      const { userId } = req.params
+      const { name, role, status } = req.body
+
+      const user = await prisma.user.findUnique({
+        where: { id: parseInt(userId) },
+      })
+
+      if (!user) {
+        return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' })
+      }
+
+      // 관리자 권한 변경 시 최소 1명의 관리자 유지 확인
+      if (role === 'MEMBER' && user.role === 'ADMIN') {
+        const adminCount = await prisma.user.count({
+          where: { role: 'ADMIN', status: 'APPROVED' },
+        })
+        if (adminCount <= 1) {
+          return res.status(400).json({ message: '최소 1명의 관리자가 필요합니다.' })
+        }
+      }
+
+      const updateData = {}
+      if (name) updateData.name = name
+      if (role) updateData.role = role
+      if (status) {
+        updateData.status = status
+        if (status === 'APPROVED' && user.status !== 'APPROVED') {
+          updateData.approvedAt = new Date()
+          updateData.approvedBy = req.user.id
+        }
+      }
+
+      const updatedUser = await prisma.user.update({
+        where: { id: parseInt(userId) },
+        data: updateData,
+        select: {
+          id: true,
+          employeeNumber: true,
+          name: true,
+          role: true,
+          status: true,
+          createdAt: true,
+          approvedAt: true,
+        },
+      })
+
+      res.json({
+        message: '회원 정보가 수정되었습니다.',
+        user: updatedUser,
+      })
+    } catch (error) {
+      next(error)
+    }
+  }
+)
+
+// 회원 삭제 (관리자)
+router.delete('/users/:userId', authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const { userId } = req.params
+
+    const user = await prisma.user.findUnique({
+      where: { id: parseInt(userId) },
+    })
+
+    if (!user) {
+      return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' })
+    }
+
+    // 관리자 삭제 시 최소 1명의 관리자 유지 확인
+    if (user.role === 'ADMIN') {
+      const adminCount = await prisma.user.count({
+        where: { role: 'ADMIN', status: 'APPROVED' },
+      })
+      if (adminCount <= 1) {
+        return res.status(400).json({ message: '최소 1명의 관리자가 필요합니다. 마지막 관리자는 삭제할 수 없습니다.' })
+      }
+    }
+
+    await prisma.user.delete({
+      where: { id: parseInt(userId) },
+    })
+
+    res.json({ message: '회원이 삭제되었습니다.' })
+  } catch (error) {
+    next(error)
+  }
+})
 
 // 로그아웃 (클라이언트에서 토큰 삭제)
 router.post('/logout', authenticate, (req, res) => {

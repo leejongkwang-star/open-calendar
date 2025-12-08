@@ -132,12 +132,11 @@ router.get('/:id', async (req, res, next) => {
     }
 
     // 사용자가 해당 팀의 구성원인지 확인
-    const teamMember = await prisma.teamMember.findUnique({
+    // Supabase Pooler 모드 호환성을 위해 findFirst 사용
+    const teamMember = await prisma.teamMember.findFirst({
       where: {
-        teamId_userId: {
-          teamId: event.teamId,
-          userId,
-        },
+        teamId: event.teamId,
+        userId,
       },
     })
 
@@ -191,12 +190,11 @@ router.post(
       }
 
       // 사용자가 해당 팀의 구성원인지 확인
-      const teamMember = await prisma.teamMember.findUnique({
+      // Supabase Pooler 모드 호환성을 위해 findFirst 사용
+      const teamMember = await prisma.teamMember.findFirst({
         where: {
-          teamId_userId: {
-            teamId: parseInt(teamId),
-            userId,
-          },
+          teamId: parseInt(teamId),
+          userId,
         },
       })
 

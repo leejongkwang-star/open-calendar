@@ -40,5 +40,29 @@ export const authAPI = {
     const response = await api.post(`/auth/reject/${userId}`, { reason })
     return response.data
   },
+
+  // 전체 회원 목록 조회 (관리자)
+  getAllUsers: async (params = {}) => {
+    const response = await api.get('/auth/users', { params })
+    return response.data
+  },
+
+  // 회원 정보 수정 (관리자)
+  updateUser: async (userId, userData) => {
+    const response = await api.put(`/auth/users/${userId}`, userData)
+    return response.data
+  },
+
+  // 회원 삭제 (관리자)
+  deleteUser: async (userId) => {
+    const response = await api.delete(`/auth/users/${userId}`)
+    return response.data
+  },
+
+  // 직원번호로 사용자 조회 (관리자)
+  getUserByEmployeeNumber: async (employeeNumber) => {
+    const response = await api.get('/auth/user-by-employee-number', { params: { employeeNumber } })
+    return response.data
+  },
 }
 

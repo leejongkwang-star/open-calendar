@@ -1,34 +1,41 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Users, Shield, Search, X, CheckCircle, XCircle, Clock } from 'lucide-react'
+import { Plus, Edit, Trash2, Users, Shield, Search, X, CheckCircle, XCircle, Clock, UserCog } from 'lucide-react'
 import { teamsAPI } from '../api/teams'
 import { authAPI } from '../api/auth'
-import { getMockTeams, getMockMembers, loadMockData, getPendingUsers, approveUser, rejectUser } from '../utils/mockData'
+import { getMockTeams, getMockMembers, getPendingUsers, approveUser, rejectUser } from '../utils/mockData'
 import { useAuthStore } from '../store/authStore'
 import TeamModal from '../components/TeamModal'
 import MemberModal from '../components/MemberModal'
 
 function AdminPage() {
   const { user } = useAuthStore()
-  const [activeTab, setActiveTab] = useState('approval') // 'approval' 또는 'teams'
+  const [activeTab, setActiveTab] = useState('approval') // 'approval', 'users', 'teams'
   const [teams, setTeams] = useState([])
   const [selectedTeam, setSelectedTeam] = useState(null)
   const [members, setMembers] = useState([])
   const [pendingUsers, setPendingUsers] = useState([])
+  const [allUsers, setAllUsers] = useState([])
   const [showTeamModal, setShowTeamModal] = useState(false)
   const [showMemberModal, setShowMemberModal] = useState(false)
   const [showRejectModal, setShowRejectModal] = useState(false)
+  const [showUserEditModal, setShowUserEditModal] = useState(false)
   const [selectedPendingUser, setSelectedPendingUser] = useState(null)
+  const [selectedUser, setSelectedUser] = useState(null)
   const [rejectionReason, setRejectionReason] = useState('')
   const [editingTeam, setEditingTeam] = useState(null)
   const [editingMember, setEditingMember] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
 
   useEffect(() => {
-    loadMockData()
+    // Mock 데이터 로드 제거 - 실제 API 사용
     loadPendingUsers()
     loadTeams()
-  }, [])
+    if (activeTab === 'users') {
+      loadAllUsers()
+    }
+  }, [activeTab])
 
   useEffect(() => {
     if (selectedTeam) {
@@ -45,12 +52,17 @@ function AdminPage() {
         setPendingUsers(pending)
       } else {
         const data = await authAPI.getPendingUsers()
-        setPendingUsers(data)
+        setPendingUsers(data || [])
       }
     } catch (error) {
       console.error('승인 대기 사용자 로드 실패:', error)
-      const pending = getPendingUsers()
-      setPendingUsers(pending)
+      console.error('에러 상세:', error.response?.data || error.message)
+      setPendingUsers([])
+      // 인증 오류가 아닌 경우에만 알림 표시
+      if (error.response?.status !== 401 && error.response?.status !== 403) {
+        const errorMessage = error.response?.data?.message || error.message || '승인 대기 사용자 목록을 불러오는데 실패했습니다.'
+        alert(`승인 대기 사용자 목록을 불러오는데 실패했습니다.\n\n${errorMessage}`)
+      }
     }
   }
 
@@ -63,12 +75,23 @@ function AdminPage() {
         setTeams(mockTeams)
       } else {
         const data = await teamsAPI.getTeams()
-        setTeams(data)
+        console.log('팀 목록 로드 성공:', data)
+        setTeams(data || [])
       }
     } catch (error) {
       console.error('팀 로드 실패:', error)
-      const mockTeams = getMockTeams()
-      setTeams(mockTeams)
+      console.error('에러 상세:', error.response?.data || error.message)
+      setTeams([])
+      // 인증 오류인 경우 로그인 페이지로 리다이렉트
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        alert('인증이 만료되었습니다. 다시 로그인해주세요.')
+        setTimeout(() => {
+          window.location.href = '/login'
+        }, 1000)
+      } else {
+        const errorMessage = error.response?.data?.message || error.message || '팀 목록을 불러오는데 실패했습니다.'
+        alert(`팀 목록을 불러오는데 실패했습니다.\n\n${errorMessage}`)
+      }
     }
   }
 
@@ -81,12 +104,23 @@ function AdminPage() {
         setMembers(mockMembers)
       } else {
         const data = await teamsAPI.getTeamMembers(teamId)
-        setMembers(data)
+        console.log('구성원 목록 로드 성공:', data)
+        setMembers(data || [])
       }
     } catch (error) {
       console.error('구성원 로드 실패:', error)
-      const mockMembers = getMockMembers()
-      setMembers(mockMembers)
+      console.error('에러 상세:', error.response?.data || error.message)
+      setMembers([])
+      // 인증 오류인 경우 로그인 페이지로 리다이렉트
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        alert('인증이 만료되었습니다. 다시 로그인해주세요.')
+        setTimeout(() => {
+          window.location.href = '/login'
+        }, 1000)
+      } else {
+        const errorMessage = error.response?.data?.message || error.message || '구성원 목록을 불러오는데 실패했습니다.'
+        alert(`구성원 목록을 불러오는데 실패했습니다.\n\n${errorMessage}`)
+      }
     }
   }
 
@@ -192,24 +226,109 @@ function AdminPage() {
   }
 
   const handleUpdateMemberRole = async (memberId, newRole) => {
-    if (!window.confirm(`이 구성원의 권한을 ${newRole === 'admin' ? '관리자' : '일반 구성원'}로 변경하시겠습니까?`)) {
+    // newRole을 대문자로 변환 (백엔드는 'ADMIN', 'MEMBER'를 기대)
+    const roleUpper = newRole.toUpperCase()
+    const roleText = roleUpper === 'ADMIN' ? '관리자' : '일반 구성원'
+    
+    if (!window.confirm(`이 구성원의 권한을 ${roleText}로 변경하시겠습니까?`)) {
       return
     }
 
     try {
-      await teamsAPI.updateMemberRole(selectedTeam.id, memberId, newRole)
+      await teamsAPI.updateMemberRole(selectedTeam.id, memberId, roleUpper)
       loadMembers(selectedTeam.id)
     } catch (error) {
       console.error('권한 변경 실패:', error)
-      alert('권한 변경에 실패했습니다.')
+      console.error('에러 상세:', error.response?.data || error.message)
+      const errorMessage = error.response?.data?.message || error.message || '권한 변경에 실패했습니다.'
+      alert(`권한 변경에 실패했습니다.\n\n${errorMessage}`)
     }
+  }
+
+  const loadAllUsers = async () => {
+    try {
+      const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
+      
+      if (USE_MOCK) {
+        // Mock 데이터는 전체 사용자 목록이 없으므로 빈 배열 반환
+        setAllUsers([])
+      } else {
+        const params = {}
+        // 백엔드는 대문자('PENDING', 'APPROVED', 'REJECTED')를 기대하므로 변환
+        if (statusFilter !== 'all') params.status = statusFilter.toUpperCase()
+        // 백엔드는 대문자('ADMIN', 'MEMBER')를 기대하므로 변환
+        if (roleFilter !== 'all') params.role = roleFilter.toUpperCase()
+        if (searchTerm) params.search = searchTerm
+        
+        const data = await authAPI.getAllUsers(params)
+        setAllUsers(data || [])
+      }
+    } catch (error) {
+      console.error('회원 목록 로드 실패:', error)
+      setAllUsers([])
+      alert('회원 목록을 불러오는데 실패했습니다.')
+    }
+  }
+
+  const handleUpdateUser = async (userId, userData) => {
+    try {
+      const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
+      
+      if (!USE_MOCK) {
+        await authAPI.updateUser(userId, userData)
+        loadAllUsers()
+        setShowUserEditModal(false)
+        setSelectedUser(null)
+        alert('회원 정보가 수정되었습니다.')
+      }
+    } catch (error) {
+      console.error('회원 정보 수정 실패:', error)
+      alert(error.response?.data?.message || '회원 정보 수정에 실패했습니다.')
+    }
+  }
+
+  const handleDeleteUser = async (userId) => {
+    if (!window.confirm('이 회원을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+      return
+    }
+
+    try {
+      const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
+      
+      if (!USE_MOCK) {
+        await authAPI.deleteUser(userId)
+        loadAllUsers()
+        alert('회원이 삭제되었습니다.')
+      }
+    } catch (error) {
+      console.error('회원 삭제 실패:', error)
+      alert(error.response?.data?.message || '회원 삭제에 실패했습니다.')
+    }
+  }
+
+  const handleEditUser = (user) => {
+    setSelectedUser(user)
+    setShowUserEditModal(true)
   }
 
   const filteredMembers = members.filter((member) => {
     const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (member.employeeNumber && member.employeeNumber.toUpperCase().includes(searchTerm.toUpperCase()))
-    const matchesRole = roleFilter === 'all' || member.role === roleFilter
+    // role 비교를 대소문자 구분 없이 처리
+    const matchesRole = roleFilter === 'all' || 
+      (member.role && member.role.toUpperCase() === roleFilter.toUpperCase())
     return matchesSearch && matchesRole
+  })
+
+  const filteredUsers = allUsers.filter((user) => {
+    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.employeeNumber.toUpperCase().includes(searchTerm.toUpperCase())
+    // role, status 비교를 대소문자 구분 없이 처리
+    const matchesRole = roleFilter === 'all' || 
+      (user.role && user.role.toUpperCase() === roleFilter.toUpperCase())
+    const matchesStatus = statusFilter === 'all' || 
+      (user.status && user.status.toUpperCase() === statusFilter.toUpperCase())
+    return matchesSearch && matchesRole && matchesStatus
   })
 
   const formatDate = (dateString) => {
@@ -250,6 +369,19 @@ function AdminPage() {
                   {pendingUsers.length}
                 </span>
               )}
+            </div>
+          </button>
+          <button
+            onClick={() => setActiveTab('users')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'users'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <div className="flex items-center">
+              <UserCog className="w-4 h-4 mr-2" />
+              회원 관리
             </div>
           </button>
           <button
@@ -497,7 +629,7 @@ function AdminPage() {
                           <td className="px-4 py-3 text-sm text-gray-600">{member.position || '-'}</td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
-                              {member.role === 'admin' ? (
+                              {member.role && member.role.toUpperCase() === 'ADMIN' ? (
                                 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
                                   <Shield className="w-3 h-3 mr-1" />
                                   관리자
@@ -511,7 +643,7 @@ function AdminPage() {
                                 onClick={() =>
                                   handleUpdateMemberRole(
                                     member.id,
-                                    member.role === 'admin' ? 'member' : 'admin'
+                                    member.role && member.role.toUpperCase() === 'ADMIN' ? 'MEMBER' : 'ADMIN'
                                   )
                                 }
                                 className="text-xs text-primary-600 hover:text-primary-700"
@@ -644,6 +776,101 @@ function AdminPage() {
             setEditingMember(null)
           }}
         />
+      )}
+
+      {/* 회원 수정 모달 */}
+      {showUserEditModal && selectedUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="flex justify-between items-center p-6 border-b">
+              <h2 className="text-xl font-bold text-gray-900">회원 정보 수정</h2>
+              <button
+                onClick={() => {
+                  setShowUserEditModal(false)
+                  setSelectedUser(null)
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                const formData = new FormData(e.target)
+                handleUpdateUser(selectedUser.id, {
+                  name: formData.get('name'),
+                  role: formData.get('role'),
+                  status: formData.get('status'),
+                })
+              }}
+              className="p-6 space-y-4"
+            >
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  이름
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  defaultValue={selectedUser.name}
+                  className="input-field"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  직원번호
+                </label>
+                <input
+                  type="text"
+                  value={selectedUser.employeeNumber}
+                  className="input-field bg-gray-100"
+                  disabled
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  권한
+                </label>
+                <select name="role" defaultValue={selectedUser.role} className="input-field">
+                  <option value="MEMBER">일반</option>
+                  <option value="ADMIN">관리자</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  상태
+                </label>
+                <select name="status" defaultValue={selectedUser.status} className="input-field">
+                  <option value="PENDING">대기중</option>
+                  <option value="APPROVED">승인됨</option>
+                  <option value="REJECTED">거부됨</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUserEditModal(false)
+                    setSelectedUser(null)
+                  }}
+                  className="btn-secondary"
+                >
+                  취소
+                </button>
+                <button type="submit" className="btn-primary">
+                  수정
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   )

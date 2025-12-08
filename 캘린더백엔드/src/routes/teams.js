@@ -12,32 +12,73 @@ router.use(authenticate)
 router.get('/', async (req, res, next) => {
   try {
     const userId = req.user.id
+    const userRole = req.user.role
 
-    // 사용자가 속한 팀 조회
-    const teamMembers = await prisma.teamMember.findMany({
-      where: { userId },
-      include: {
-        team: {
-          include: {
-            _count: {
-              select: { members: true },
+    console.log(`[팀 목록 조회] 사용자 ID: ${userId}, 권한: ${userRole}`)
+
+    // 관리자는 모든 팀 조회, 일반 사용자는 자신이 속한 팀만 조회
+    if (userRole === 'ADMIN') {
+      // 관리자: 모든 팀 조회
+      const allTeams = await prisma.team.findMany({
+        include: {
+          _count: {
+            select: { members: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      })
+
+      // 사용자가 속한 팀의 role 정보도 포함
+      const userTeamMembers = await prisma.teamMember.findMany({
+        where: { userId },
+        select: {
+          teamId: true,
+          role: true,
+        },
+      })
+
+      const teamRoleMap = new Map(
+        userTeamMembers.map((tm) => [tm.teamId, tm.role])
+      )
+
+      const teams = allTeams.map((team) => ({
+        id: team.id,
+        name: team.name,
+        description: team.description,
+        memberCount: team._count.members,
+        role: teamRoleMap.get(team.id) || null, // 사용자가 속한 팀이면 role, 아니면 null
+        createdAt: team.createdAt,
+      }))
+
+      res.json(teams)
+    } else {
+      // 일반 사용자: 자신이 속한 팀만 조회
+      const teamMembers = await prisma.teamMember.findMany({
+        where: { userId },
+        include: {
+          team: {
+            include: {
+              _count: {
+                select: { members: true },
+              },
             },
           },
         },
-      },
-    })
+      })
 
-    const teams = teamMembers.map((tm) => ({
-      id: tm.team.id,
-      name: tm.team.name,
-      description: tm.team.description,
-      memberCount: tm.team._count.members,
-      role: tm.role,
-      createdAt: tm.team.createdAt,
-    }))
+      const teams = teamMembers.map((tm) => ({
+        id: tm.team.id,
+        name: tm.team.name,
+        description: tm.team.description,
+        memberCount: tm.team._count.members,
+        role: tm.role,
+        createdAt: tm.team.createdAt,
+      }))
 
-    res.json(teams)
+      res.json(teams)
+    }
   } catch (error) {
+    console.error('[팀 목록 조회 오류]', error)
     next(error)
   }
 })
@@ -49,12 +90,11 @@ router.get('/:id', async (req, res, next) => {
     const userId = req.user.id
 
     // 사용자가 해당 팀의 구성원인지 확인
-    const teamMember = await prisma.teamMember.findUnique({
+    // Supabase Pooler 모드 호환성을 위해 findFirst 사용
+    const teamMember = await prisma.teamMember.findFirst({
       where: {
-        teamId_userId: {
-          teamId: parseInt(id),
-          userId,
-        },
+        teamId: parseInt(id),
+        userId,
       },
       include: {
         team: {
@@ -223,21 +263,24 @@ router.get('/:teamId/members', async (req, res, next) => {
   try {
     const { teamId } = req.params
     const userId = req.user.id
+    const userRole = req.user.role
 
-    // 사용자가 해당 팀의 구성원인지 확인
-    const teamMember = await prisma.teamMember.findUnique({
-      where: {
-        teamId_userId: {
+    // 관리자는 모든 팀의 구성원 조회 가능, 일반 사용자는 자신이 속한 팀만 조회
+    if (userRole !== 'ADMIN') {
+      // 일반 사용자: 자신이 속한 팀인지 확인
+      const teamMember = await prisma.teamMember.findFirst({
+        where: {
           teamId: parseInt(teamId),
           userId,
         },
-      },
-    })
+      })
 
-    if (!teamMember) {
-      return res.status(403).json({ message: '이 팀에 접근할 권한이 없습니다.' })
+      if (!teamMember) {
+        return res.status(403).json({ message: '이 팀에 접근할 권한이 없습니다.' })
+      }
     }
 
+    // 팀의 모든 구성원 조회
     const members = await prisma.teamMember.findMany({
       where: { teamId: parseInt(teamId) },
       include: {
@@ -265,6 +308,7 @@ router.get('/:teamId/members', async (req, res, next) => {
 
     res.json(formattedMembers)
   } catch (error) {
+    console.error('[구성원 목록 조회 오류]', error)
     next(error)
   }
 })
@@ -274,7 +318,10 @@ router.post(
   '/:teamId/members',
   requireAdmin,
   [
-    body('userId').isInt().withMessage('사용자 ID는 숫자여야 합니다.'),
+    // userId 또는 employeeNumber 중 하나는 필수
+    body('userId').optional().isInt().withMessage('사용자 ID는 숫자여야 합니다.'),
+    body('employeeNumber').optional().trim().matches(/^[A-Za-z0-9]{6}$/).withMessage('직원번호는 6자리 영문과 숫자 조합이어야 합니다.'),
+    body('name').optional().trim().isLength({ min: 2 }).withMessage('이름은 2자 이상이어야 합니다.'),
     body('position').optional().trim(),
     body('phone').optional().trim(),
     body('role').optional().isIn(['ADMIN', 'MEMBER']).withMessage('권한이 올바르지 않습니다.'),
@@ -287,10 +334,12 @@ router.post(
       }
 
       const { teamId } = req.params
-      const { userId, position, phone, role } = req.body
+      const { userId, employeeNumber, name, position, phone, role } = req.body
+      const adminId = req.user.id
 
       // 팀 존재 확인
-      const team = await prisma.team.findUnique({
+      // Supabase Pooler 모드 호환성을 위해 findFirst 사용
+      const team = await prisma.team.findFirst({
         where: { id: parseInt(teamId) },
       })
 
@@ -298,26 +347,72 @@ router.post(
         return res.status(404).json({ message: '팀을 찾을 수 없습니다.' })
       }
 
-      // 사용자 존재 및 승인 상태 확인
-      const user = await prisma.user.findUnique({
-        where: { id: parseInt(userId) },
-      })
+      let user = null
+      let finalUserId = null
 
-      if (!user) {
-        return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' })
-      }
+      if (userId) {
+        // userId가 제공된 경우: 기존 사용자 사용
+        user = await prisma.user.findFirst({
+          where: { id: parseInt(userId) },
+        })
 
-      if (user.status !== 'APPROVED') {
-        return res.status(400).json({ message: '승인된 사용자만 팀에 추가할 수 있습니다.' })
+        if (!user) {
+          return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' })
+        }
+
+        finalUserId = user.id
+      } else if (employeeNumber) {
+        // employeeNumber가 제공된 경우: 사용자 찾기 또는 생성
+        // Supabase Pooler 모드 호환성을 위해 findFirst 사용
+        user = await prisma.user.findFirst({
+          where: { employeeNumber: employeeNumber.toUpperCase() },
+        })
+
+        if (!user) {
+          // 사용자가 없으면 관리자가 직접 생성 (자동 승인)
+          if (!name) {
+            return res.status(400).json({ message: '새 사용자를 생성하려면 이름이 필요합니다.' })
+          }
+
+          // 임시 비밀번호 생성 (나중에 사용자가 변경할 수 있도록)
+          const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8)
+          const bcrypt = (await import('bcryptjs')).default
+          const hashedPassword = await bcrypt.hash(tempPassword, 10)
+
+          user = await prisma.user.create({
+            data: {
+              name,
+              employeeNumber: employeeNumber.toUpperCase(),
+              password: hashedPassword,
+              role: 'MEMBER',
+              status: 'APPROVED', // 관리자가 추가한 사용자는 자동 승인
+              approvedAt: new Date(),
+              approvedBy: adminId,
+            },
+            select: {
+              id: true,
+              employeeNumber: true,
+              name: true,
+              role: true,
+              status: true,
+            },
+          })
+
+          finalUserId = user.id
+        } else {
+          // 사용자가 있으면 승인 상태와 관계없이 바로 추가 가능 (관리자 권한)
+          finalUserId = user.id
+        }
+      } else {
+        return res.status(400).json({ message: '사용자 ID 또는 직원번호가 필요합니다.' })
       }
 
       // 중복 확인
-      const existingMember = await prisma.teamMember.findUnique({
+      // Supabase Pooler 모드 호환성을 위해 findFirst 사용
+      const existingMember = await prisma.teamMember.findFirst({
         where: {
-          teamId_userId: {
-            teamId: parseInt(teamId),
-            userId: parseInt(userId),
-          },
+          teamId: parseInt(teamId),
+          userId: finalUserId,
         },
       })
 
@@ -328,7 +423,7 @@ router.post(
       const member = await prisma.teamMember.create({
         data: {
           teamId: parseInt(teamId),
-          userId: parseInt(userId),
+          userId: finalUserId,
           position,
           phone,
           role: role || 'MEMBER',
@@ -379,8 +474,12 @@ router.put(
       const { teamId, memberId } = req.params
       const { position, phone, role } = req.body
 
-      const member = await prisma.teamMember.findUnique({
-        where: { id: parseInt(memberId) },
+      // Supabase Pooler 모드 호환성을 위해 findFirst 사용
+      const member = await prisma.teamMember.findFirst({
+        where: {
+          id: parseInt(memberId),
+          teamId: parseInt(teamId),
+        },
         include: {
           user: {
             select: {
@@ -392,7 +491,7 @@ router.put(
         },
       })
 
-      if (!member || member.teamId !== parseInt(teamId)) {
+      if (!member) {
         return res.status(404).json({ message: '구성원을 찾을 수 없습니다.' })
       }
 
@@ -426,6 +525,7 @@ router.put(
         createdAt: updatedMember.createdAt,
       })
     } catch (error) {
+      console.error('[권한 변경 오류]', error)
       next(error)
     }
   }
@@ -436,11 +536,15 @@ router.delete('/:teamId/members/:memberId', requireAdmin, async (req, res, next)
   try {
     const { teamId, memberId } = req.params
 
-    const member = await prisma.teamMember.findUnique({
-      where: { id: parseInt(memberId) },
+    // Supabase Pooler 모드 호환성을 위해 findFirst 사용
+    const member = await prisma.teamMember.findFirst({
+      where: {
+        id: parseInt(memberId),
+        teamId: parseInt(teamId),
+      },
     })
 
-    if (!member || member.teamId !== parseInt(teamId)) {
+    if (!member) {
       return res.status(404).json({ message: '구성원을 찾을 수 없습니다.' })
     }
 
@@ -469,8 +573,12 @@ router.patch(
       const { teamId, memberId } = req.params
       const { role } = req.body
 
-      const member = await prisma.teamMember.findUnique({
-        where: { id: parseInt(memberId) },
+      // Supabase Pooler 모드 호환성을 위해 findFirst 사용
+      const member = await prisma.teamMember.findFirst({
+        where: {
+          id: parseInt(memberId),
+          teamId: parseInt(teamId),
+        },
         include: {
           user: {
             select: {
@@ -482,7 +590,7 @@ router.patch(
         },
       })
 
-      if (!member || member.teamId !== parseInt(teamId)) {
+      if (!member) {
         return res.status(404).json({ message: '구성원을 찾을 수 없습니다.' })
       }
 

@@ -165,16 +165,17 @@ export const mockLogin = (employeeNumber, password) => {
       const users = getMockUsers()
       const user = users.find((u) => u.employeeNumber === employeeNumber.toUpperCase())
       if (user) {
-        // 승인 상태 확인
-        if (user.status === 'pending') {
+        // 승인 상태 확인 (대소문자 구분 없이 처리)
+        const userStatus = user.status ? user.status.toUpperCase() : ''
+        if (userStatus === 'PENDING') {
           reject(new Error('관리자 승인 대기 중입니다. 승인 후 로그인할 수 있습니다.'))
           return
         }
-        if (user.status === 'rejected') {
+        if (userStatus === 'REJECTED') {
           reject(new Error('회원가입이 거부되었습니다. 관리자에게 문의하세요.'))
           return
         }
-        if (user.status !== 'approved') {
+        if (userStatus !== 'APPROVED') {
           reject(new Error('로그인할 수 없는 상태입니다. 관리자에게 문의하세요.'))
           return
         }
@@ -193,7 +194,8 @@ export const mockLogin = (employeeNumber, password) => {
 // 승인 대기 사용자 목록 가져오기
 export const getPendingUsers = () => {
   const users = getMockUsers()
-  return users.filter((u) => u.status === 'pending')
+  // 대소문자 구분 없이 처리
+  return users.filter((u) => u.status && u.status.toUpperCase() === 'PENDING')
 }
 
 // 사용자 승인

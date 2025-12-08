@@ -8,18 +8,20 @@ function MemberModal({ teamId, member, onClose, onSave }) {
     employeeNumber: '',
     position: '',
     phone: '',
-    role: 'member',
+    role: 'MEMBER', // 백엔드는 대문자('ADMIN', 'MEMBER')를 기대
   })
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (member) {
+      // 백엔드에서 받은 role을 대소문자 구분 없이 처리하되, 저장은 대문자로
+      const role = member.role ? member.role.toUpperCase() : 'MEMBER'
       setFormData({
         name: member.name || '',
         employeeNumber: member.employeeNumber || '',
         position: member.position || '',
         phone: member.phone || '',
-        role: member.role || 'member',
+        role: role,
       })
     }
   }, [member])
@@ -35,14 +37,28 @@ function MemberModal({ teamId, member, onClose, onSave }) {
 
     try {
       if (member?.id) {
-        await teamsAPI.updateTeamMember(teamId, member.id, formData)
+        // 수정 모드: 백엔드는 대문자('ADMIN', 'MEMBER')를 기대
+        await teamsAPI.updateTeamMember(teamId, member.id, {
+          ...formData,
+          role: formData.role.toUpperCase(),
+        })
       } else {
-        await teamsAPI.addTeamMember(teamId, formData)
+        // 추가 모드: 관리자가 직접 구성원 추가 (승인 절차 없음)
+        // 직원번호와 이름을 전송하면, 사용자가 없으면 자동 생성하고 승인 상태로 설정
+        await teamsAPI.addTeamMember(teamId, {
+          employeeNumber: formData.employeeNumber.toUpperCase(),
+          name: formData.name,
+          position: formData.position,
+          phone: formData.phone,
+          role: formData.role.toUpperCase(),
+        })
       }
       onSave()
     } catch (error) {
       console.error('구성원 저장 실패:', error)
-      alert('구성원 저장에 실패했습니다.')
+      console.error('에러 상세:', error.response?.data || error.message)
+      const errorMessage = error.response?.data?.message || error.message || '구성원 저장에 실패했습니다.'
+      alert(`구성원 저장에 실패했습니다.\n\n${errorMessage}`)
     } finally {
       setLoading(false)
     }
@@ -139,8 +155,8 @@ function MemberModal({ teamId, member, onClose, onSave }) {
               className="input-field"
               required
             >
-              <option value="member">일반 구성원</option>
-              <option value="admin">관리자</option>
+              <option value="MEMBER">일반 구성원</option>
+              <option value="ADMIN">관리자</option>
             </select>
           </div>
 
