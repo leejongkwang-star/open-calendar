@@ -168,9 +168,22 @@ router.post(
   '/',
   [
     body('title').trim().notEmpty().withMessage('제목을 입력해주세요.'),
-    body('startDate').isISO8601().withMessage('시작일은 유효한 날짜 형식이어야 합니다.'),
-    body('endDate').isISO8601().withMessage('종료일은 유효한 날짜 형식이어야 합니다.'),
-    body('eventType').isIn(['VACATION', 'MEETING', 'OTHER']).withMessage('일정 유형이 올바르지 않습니다.'),
+    body('startDate').custom((value) => {
+      // ISO 8601 형식 또는 "YYYY-MM-DDTHH:mm" 형식 허용
+      if (!value) return false
+      // ISO 8601 형식 또는 날짜+시간 형식 확인
+      const isoRegex = /^\d{4}-\d{2}-\d{2}(T|\s)\d{2}:\d{2}/
+      const dateRegex = /^\d{4}-\d{2}-\d{2}/
+      return isoRegex.test(value) || dateRegex.test(value)
+    }).withMessage('시작일은 유효한 날짜 형식이어야 합니다.'),
+    body('endDate').custom((value) => {
+      // ISO 8601 형식 또는 "YYYY-MM-DDTHH:mm" 형식 허용
+      if (!value) return false
+      const isoRegex = /^\d{4}-\d{2}-\d{2}(T|\s)\d{2}:\d{2}/
+      const dateRegex = /^\d{4}-\d{2}-\d{2}/
+      return isoRegex.test(value) || dateRegex.test(value)
+    }).withMessage('종료일은 유효한 날짜 형식이어야 합니다.'),
+    body('eventType').isIn(['VACATION', 'MEETING', 'TRAINING', 'BUSINESS_TRIP', 'OTHER']).withMessage('일정 유형이 올바르지 않습니다.'),
     body('teamId').isInt().withMessage('팀 ID는 숫자여야 합니다.'),
   ],
   async (req, res, next) => {
@@ -202,15 +215,124 @@ router.post(
         return res.status(403).json({ message: '해당 팀의 구성원만 일정을 등록할 수 있습니다.' })
       }
 
+      // 날짜 문자열을 로컬 시간대로 파싱 (타임존 오류 방지)
+      // PostgreSQL이 UTC로 저장하므로, 로컬 시간을 UTC로 변환하여 저장
+      const parseLocalDate = (dateString, timeString = null) => {
+        if (!dateString) return null
+        
+        // 날짜만 있는 경우 (YYYY-MM-DD)
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+          const [year, month, day] = dateString.split('-').map(Number)
+          
+          // 시간이 제공된 경우 시간도 파싱
+          if (timeString && /^\d{2}:\d{2}$/.test(timeString)) {
+            const [hours, minutes] = timeString.split(':').map(Number)
+            const localDate = new Date(year, month - 1, day, hours, minutes, 0, 0)
+            // UTC 오프셋을 고려하여 UTC로 변환
+            const utcDate = new Date(localDate.getTime() - localDate.getTimezoneOffset() * 60000)
+            return utcDate
+          }
+          
+          // 시간이 없으면 자정으로 설정
+          const localDate = new Date(year, month - 1, day, 0, 0, 0, 0)
+          const utcDate = new Date(localDate.getTime() - localDate.getTimezoneOffset() * 60000)
+          return utcDate
+        }
+        
+        // 시간이 포함된 경우 그대로 파싱
+        return new Date(dateString)
+      }
+
+      // startDate와 endDate에 시간이 포함되어 있으면 파싱
+      // 형식: "YYYY-MM-DDTHH:mm" 또는 "YYYY-MM-DD HH:mm" 또는 "YYYY-MM-DD"
+      // PostgreSQL이 UTC로 저장하므로, 로컬 시간을 UTC로 변환하여 저장
+      const parseDateTime = (dateTimeString) => {
+        if (!dateTimeString) return null
+        
+        // ISO 형식 (YYYY-MM-DDTHH:mm) - UTC로 파싱하여 저장
+        if (dateTimeString.includes('T')) {
+          const parts = dateTimeString.split('T')
+          if (parts.length === 2) {
+            const [datePart, timePart] = parts
+            const [year, month, day] = datePart.split('-').map(Number)
+            const [hours, minutes] = timePart.split(':').map(Number)
+            // 로컬 시간으로 Date 객체 생성
+            const localDate = new Date(year, month - 1, day, hours || 0, minutes || 0, 0, 0)
+            // UTC 오프셋을 고려하여 UTC로 변환
+            // 로컬 시간에서 UTC 오프셋만큼 빼서 UTC 시간으로 만들기
+            const utcDate = new Date(localDate.getTime() - localDate.getTimezoneOffset() * 60000)
+            return utcDate
+          }
+        }
+        
+        // 공백 형식 (YYYY-MM-DD HH:mm)
+        if (dateTimeString.includes(' ')) {
+          const parts = dateTimeString.split(' ')
+          if (parts.length === 2) {
+            const [datePart, timePart] = parts
+            const [year, month, day] = datePart.split('-').map(Number)
+            const [hours, minutes] = timePart.split(':').map(Number)
+            // 로컬 시간으로 Date 객체 생성
+            const localDate = new Date(year, month - 1, day, hours || 0, minutes || 0, 0, 0)
+            // UTC 오프셋을 고려하여 UTC로 변환
+            const utcDate = new Date(localDate.getTime() - localDate.getTimezoneOffset() * 60000)
+            return utcDate
+          }
+        }
+        
+        // 날짜만 있는 경우 (YYYY-MM-DD) - 이 경우 시간은 00:00으로 설정
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateTimeString)) {
+          const [year, month, day] = dateTimeString.split('-').map(Number)
+          const localDate = new Date(year, month - 1, day, 0, 0, 0, 0)
+          const utcDate = new Date(localDate.getTime() - localDate.getTimezoneOffset() * 60000)
+          return utcDate
+        }
+        
+        // 기타 형식은 기본 Date 생성자 사용
+        return new Date(dateTimeString)
+      }
+
+      // startDate와 endDate에 시간이 포함되어 있으면 직접 파싱
+      // startTime, endTime이 별도로 전달된 경우 결합 (하위 호환성)
+      let parsedStartDate
+      let parsedEndDate
+      
+      if (startDate) {
+        if (startTime && /^\d{2}:\d{2}$/.test(startTime)) {
+          // startTime이 별도로 전달된 경우 (하위 호환성)
+          parsedStartDate = parseLocalDate(startDate, startTime)
+        } else {
+          // startDate에 시간이 포함된 경우 (예: "2025-12-10T09:00")
+          parsedStartDate = parseDateTime(startDate)
+        }
+      }
+      
+      if (endDate) {
+        if (endTime && /^\d{2}:\d{2}$/.test(endTime)) {
+          // endTime이 별도로 전달된 경우 (하위 호환성)
+          parsedEndDate = parseLocalDate(endDate, endTime)
+        } else {
+          // endDate에 시간이 포함된 경우 (예: "2025-12-10T18:00")
+          parsedEndDate = parseDateTime(endDate)
+        }
+      }
+
+      // eventType 대소문자 정리 및 검증
+      const normalizedEventType = eventType ? eventType.toUpperCase().trim() : 'OTHER'
+      const validEventTypes = ['VACATION', 'MEETING', 'TRAINING', 'BUSINESS_TRIP', 'OTHER']
+      if (!validEventTypes.includes(normalizedEventType)) {
+        return res.status(400).json({ message: `일정 유형이 올바르지 않습니다. 허용된 값: ${validEventTypes.join(', ')}` })
+      }
+
       const event = await prisma.event.create({
         data: {
           title,
           description,
-          startDate: new Date(startDate),
-          endDate: new Date(endDate),
-          startTime: startTime ? new Date(startTime) : null,
-          endTime: endTime ? new Date(endTime) : null,
-          eventType,
+          startDate: parsedStartDate,
+          endDate: parsedEndDate,
+          startTime: parsedStartDate, // startDate와 동일하게 저장
+          endTime: parsedEndDate, // endDate와 동일하게 저장
+          eventType: normalizedEventType,
           userId,
           teamId: parseInt(teamId),
         },
@@ -256,9 +378,19 @@ router.put(
   '/:id',
   [
     body('title').optional().trim().notEmpty().withMessage('제목을 입력해주세요.'),
-    body('startDate').optional().isISO8601().withMessage('시작일은 유효한 날짜 형식이어야 합니다.'),
-    body('endDate').optional().isISO8601().withMessage('종료일은 유효한 날짜 형식이어야 합니다.'),
-    body('eventType').optional().isIn(['VACATION', 'MEETING', 'OTHER']).withMessage('일정 유형이 올바르지 않습니다.'),
+    body('startDate').optional().custom((value) => {
+      if (!value) return true
+      const isoRegex = /^\d{4}-\d{2}-\d{2}(T|\s)\d{2}:\d{2}/
+      const dateRegex = /^\d{4}-\d{2}-\d{2}/
+      return isoRegex.test(value) || dateRegex.test(value)
+    }).withMessage('시작일은 유효한 날짜 형식이어야 합니다.'),
+    body('endDate').optional().custom((value) => {
+      if (!value) return true
+      const isoRegex = /^\d{4}-\d{2}-\d{2}(T|\s)\d{2}:\d{2}/
+      const dateRegex = /^\d{4}-\d{2}-\d{2}/
+      return isoRegex.test(value) || dateRegex.test(value)
+    }).withMessage('종료일은 유효한 날짜 형식이어야 합니다.'),
+    body('eventType').optional().isIn(['VACATION', 'MEETING', 'TRAINING', 'BUSINESS_TRIP', 'OTHER']).withMessage('일정 유형이 올바르지 않습니다.'),
   ],
   async (req, res, next) => {
     try {
@@ -285,14 +417,114 @@ router.put(
         return res.status(403).json({ message: '이 이벤트를 수정할 권한이 없습니다.' })
       }
 
+      // 날짜+시간 문자열을 파싱하는 함수
+      // PostgreSQL이 UTC로 저장하므로, 로컬 시간을 UTC로 변환하여 저장
+      const parseDateTime = (dateTimeString) => {
+        if (!dateTimeString) return null
+        
+        // ISO 형식 (YYYY-MM-DDTHH:mm) - UTC로 파싱하여 저장
+        if (dateTimeString.includes('T')) {
+          const parts = dateTimeString.split('T')
+          if (parts.length === 2) {
+            const [datePart, timePart] = parts
+            const [year, month, day] = datePart.split('-').map(Number)
+            const [hours, minutes] = timePart.split(':').map(Number)
+            // 로컬 시간으로 Date 객체 생성
+            const localDate = new Date(year, month - 1, day, hours || 0, minutes || 0, 0, 0)
+            // UTC 오프셋을 고려하여 UTC로 변환
+            const utcDate = new Date(localDate.getTime() - localDate.getTimezoneOffset() * 60000)
+            return utcDate
+          }
+        }
+        
+        // 공백 형식 (YYYY-MM-DD HH:mm)
+        if (dateTimeString.includes(' ')) {
+          const parts = dateTimeString.split(' ')
+          if (parts.length === 2) {
+            const [datePart, timePart] = parts
+            const [year, month, day] = datePart.split('-').map(Number)
+            const [hours, minutes] = timePart.split(':').map(Number)
+            // 로컬 시간으로 Date 객체 생성
+            const localDate = new Date(year, month - 1, day, hours || 0, minutes || 0, 0, 0)
+            // UTC 오프셋을 고려하여 UTC로 변환
+            const utcDate = new Date(localDate.getTime() - localDate.getTimezoneOffset() * 60000)
+            return utcDate
+          }
+        }
+        
+        // 날짜만 있는 경우 (YYYY-MM-DD)
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateTimeString)) {
+          const [year, month, day] = dateTimeString.split('-').map(Number)
+          const localDate = new Date(year, month - 1, day, 0, 0, 0, 0)
+          const utcDate = new Date(localDate.getTime() - localDate.getTimezoneOffset() * 60000)
+          return utcDate
+        }
+        
+        // 기타 형식은 기본 Date 생성자 사용
+        return new Date(dateTimeString)
+      }
+      
+      // 날짜 문자열을 로컬 시간대로 파싱 (하위 호환성)
+      const parseLocalDate = (dateString, timeString = null) => {
+        if (!dateString) return null
+        
+        // 날짜만 있는 경우 (YYYY-MM-DD)
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+          const [year, month, day] = dateString.split('-').map(Number)
+          
+          // 시간이 제공된 경우 시간도 파싱
+          if (timeString && /^\d{2}:\d{2}$/.test(timeString)) {
+            const [hours, minutes] = timeString.split(':').map(Number)
+            return new Date(year, month - 1, day, hours, minutes, 0, 0)
+          }
+          
+          // 시간이 없으면 자정으로 설정
+          return new Date(year, month - 1, day, 0, 0, 0, 0)
+        }
+        
+        // 시간이 포함된 경우 그대로 파싱
+        return new Date(dateString)
+      }
+
       // 업데이트 데이터 구성
       const updateData = {}
       if (title) updateData.title = title
-      if (startDate) updateData.startDate = new Date(startDate)
-      if (endDate) updateData.endDate = new Date(endDate)
-      if (startTime !== undefined) updateData.startTime = startTime ? new Date(startTime) : null
-      if (endTime !== undefined) updateData.endTime = endTime ? new Date(endTime) : null
-      if (eventType) updateData.eventType = eventType
+      
+      // startDate와 endDate에 시간이 포함되어 있으면 직접 파싱
+      // startTime, endTime이 별도로 전달된 경우 결합 (하위 호환성)
+      if (startDate) {
+        if (startTime && /^\d{2}:\d{2}$/.test(startTime)) {
+          // startTime이 별도로 전달된 경우
+          updateData.startDate = parseLocalDate(startDate, startTime)
+        } else {
+          // startDate에 시간이 포함된 경우
+          updateData.startDate = parseDateTime(startDate)
+        }
+        // startTime은 startDate와 동일하게 저장
+        updateData.startTime = updateData.startDate
+      }
+      
+      if (endDate) {
+        if (endTime && /^\d{2}:\d{2}$/.test(endTime)) {
+          // endTime이 별도로 전달된 경우
+          updateData.endDate = parseLocalDate(endDate, endTime)
+        } else {
+          // endDate에 시간이 포함된 경우
+          updateData.endDate = parseDateTime(endDate)
+        }
+        // endTime은 endDate와 동일하게 저장
+        updateData.endTime = updateData.endDate
+      }
+      
+      // eventType 대소문자 정리 및 검증
+      if (eventType) {
+        const normalizedEventType = eventType.toUpperCase().trim()
+        const validEventTypes = ['VACATION', 'MEETING', 'TRAINING', 'BUSINESS_TRIP', 'OTHER']
+        if (!validEventTypes.includes(normalizedEventType)) {
+          return res.status(400).json({ message: `일정 유형이 올바르지 않습니다. 허용된 값: ${validEventTypes.join(', ')}` })
+        }
+        updateData.eventType = normalizedEventType
+      }
       if (description !== undefined) updateData.description = description
 
       // 시작일이 종료일보다 이전인지 확인

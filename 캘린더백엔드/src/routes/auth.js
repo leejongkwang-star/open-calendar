@@ -10,10 +10,17 @@ const router = express.Router()
 // 직원번호 중복 확인
 router.get('/check-employee-number', async (req, res, next) => {
   try {
-    const { employeeNumber } = req.query
+    let { employeeNumber } = req.query
 
     if (!employeeNumber) {
       return res.status(400).json({ message: '직원번호를 입력해주세요.' })
+    }
+
+    // 직원번호 정리 (공백, 특수문자 제거)
+    employeeNumber = employeeNumber.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+
+    if (!employeeNumber || employeeNumber.length !== 6) {
+      return res.status(400).json({ message: '직원번호는 6자리 영문과 숫자 조합이어야 합니다.' })
     }
 
     // 6자리 영문+숫자 조합 검증
@@ -35,6 +42,7 @@ router.get('/check-employee-number', async (req, res, next) => {
 
     res.json({ exists: !!user })
   } catch (error) {
+    console.error('직원번호 확인 오류:', error)
     next(error)
   }
 })

@@ -179,6 +179,7 @@ function LoginPage() {
       <ForgotPasswordModal
         isOpen={showForgotPassword}
         onClose={() => setShowForgotPassword(false)}
+        initialEmployeeNumber={employeeNumber}
       />
     </div>
   )

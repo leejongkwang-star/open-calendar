@@ -28,7 +28,7 @@ function CalendarPage() {
   const [showFilter, setShowFilter] = useState(false)
   const [filters, setFilters] = useState({
     members: [],
-    eventTypes: ['VACATION', 'MEETING', 'OTHER'],
+    eventTypes: ['VACATION', 'MEETING', 'TRAINING', 'BUSINESS_TRIP', 'OTHER'],
   })
 
   // 필터링된 이벤트
@@ -107,8 +107,18 @@ function CalendarPage() {
       
       if (USE_MOCK) {
         // 모크 모드: 로컬 스토리지 사용
+        let finalTitle = eventData.title
+        if (!selectedEvent?.id && user?.name) {
+          // 신규 등록 시: 제목에 사용자 이름 추가 (처음만)
+          finalTitle = `${eventData.title} (${user.name})`
+        } else if (selectedEvent?.id) {
+          // 수정 시: 제목에서 사용자 이름 부분 제거
+          finalTitle = eventData.title.replace(/\s*\([^)]+\)\s*$/, '').trim()
+        }
+        
         const event = {
           ...eventData,
+          title: finalTitle,
           teamId: teamId || 1,
           start: new Date(eventData.startDate + (eventData.startTime ? 'T' + eventData.startTime : '')),
           end: new Date(eventData.endDate + (eventData.endTime ? 'T' + eventData.endTime : '')),
@@ -116,10 +126,44 @@ function CalendarPage() {
         saveMockEvent(event)
       } else {
         // 실제 API 호출
+        // 날짜와 시간 처리 로직
+        const startDate = eventData.startDate
+        const endDate = eventData.endDate
+        let startTime = eventData.startTime
+        let endTime = eventData.endTime
+        
+        // 시작일과 종료일이 다른 경우 (여러 날짜 일정)
+        if (startDate !== endDate) {
+          // 여러 날짜 일정: 시작일 09시, 종료일 18시
+          startTime = '09:00'
+          endTime = '18:00'
+        }
+        // 시작일과 종료일이 같은 경우 (하루 일정)
+        // 이미 설정된 시간을 그대로 사용 (종일 버튼 클릭 시 09:00-18:00, 그 외에는 등록 시간 +1시간)
+        
+        // startDate와 endDate에 시간을 포함하여 전송
+        // 형식: "YYYY-MM-DDTHH:mm" 또는 "YYYY-MM-DD HH:mm"
+        const startDateTime = `${startDate}T${startTime || '00:00'}`
+        const endDateTime = `${endDate}T${endTime || '00:00'}`
+        
+        const finalEventData = {
+          ...eventData,
+          startDate: startDateTime,
+          endDate: endDateTime,
+          startTime: null, // startTime은 null로 전송 (startDate에 시간 포함)
+          endTime: null, // endTime은 null로 전송 (endDate에 시간 포함)
+        }
+        
         if (selectedEvent?.id) {
-          await eventsAPI.updateEvent(selectedEvent.id, eventData)
+          // 수정 시: 제목에서 사용자 이름 부분 제거
+          const cleanTitle = eventData.title.replace(/\s*\([^)]+\)\s*$/, '').trim()
+          await eventsAPI.updateEvent(selectedEvent.id, { ...finalEventData, title: cleanTitle })
         } else {
-          await eventsAPI.createEvent({ ...eventData, teamId })
+          // 신규 등록 시: 제목에 사용자 이름 추가 (처음만)
+          const titleWithName = user?.name 
+            ? `${eventData.title} (${user.name})` 
+            : eventData.title
+          await eventsAPI.createEvent({ ...finalEventData, title: titleWithName, teamId })
         }
       }
       
@@ -176,11 +220,31 @@ function CalendarPage() {
         const teamId = selectedTeamId || (teams.length > 0 ? teams[0].id : null)
         const data = await eventsAPI.getEvents(teamId, null, null)
         // 날짜 형식 변환 (백엔드에서 Date 객체로 받음)
-        const formattedEvents = data.map(event => ({
-          ...event,
-          start: new Date(event.start),
-          end: new Date(event.end),
-        }))
+        // react-big-calendar는 end 날짜를 exclusive로 처리하므로,
+        // 종료일까지 표시하려면 end를 종료일 다음 날 자정으로 설정해야 함
+        const formattedEvents = data.map(event => {
+          // 백엔드에서 받은 원본 startDate, endDate 사용
+          const start = event.start ? new Date(event.start) : new Date()
+          const end = event.end ? new Date(event.end) : new Date()
+          
+          // 원본 endDate 저장 (수정 모달에서 사용하기 위해)
+          const originalEndDate = new Date(end)
+          
+          // endDate를 다음 날 자정으로 설정 (종료일까지 포함하여 표시)
+          // 예: 12월 9일 ~ 12월 10일 → end를 12월 11일 00:00:00으로 설정
+          const endDate = new Date(end)
+          endDate.setDate(endDate.getDate() + 1) // 다음 날로 설정
+          endDate.setHours(0, 0, 0, 0) // 자정으로 설정
+          
+          return {
+            ...event,
+            startDate: start, // 원본 startDate 저장
+            endDate: end, // 원본 endDate 저장
+            start: start, // 캘린더 표시용 start
+            end: endDate, // 종료일 다음 날 자정 (캘린더 표시용)
+            originalEndDate: originalEndDate, // 원본 종료일 (수정 모달용)
+          }
+        })
         setEvents(formattedEvents)
       }
     } catch (error) {
@@ -203,6 +267,18 @@ function CalendarPage() {
       MEETING: {
         backgroundColor: '#059669',
         borderColor: '#047857',
+        color: '#ffffff',
+        fontWeight: '600',
+      },
+      TRAINING: {
+        backgroundColor: '#ea580c',
+        borderColor: '#c2410c',
+        color: '#ffffff',
+        fontWeight: '600',
+      },
+      BUSINESS_TRIP: {
+        backgroundColor: '#0891b2',
+        borderColor: '#0e7490',
         color: '#ffffff',
         fontWeight: '600',
       },
@@ -278,10 +354,19 @@ function CalendarPage() {
       <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6" style={{ minHeight: '700px' }}>
         <Calendar
           localizer={localizer}
-          events={filteredEvents.map(event => ({
-            ...event,
-            title: event.userName ? `${event.title} (${event.userName})` : event.title,
-          }))}
+          events={filteredEvents.map(event => {
+            // 제목에 이미 사용자 이름이 포함되어 있는지 확인 (예: "제목 (이름)" 형식)
+            const hasUserNameInTitle = event.title && /\([^)]+\)/.test(event.title)
+            // 사용자 이름이 있고, 제목에 이미 포함되어 있지 않으면 추가
+            const displayTitle = event.userName && !hasUserNameInTitle 
+              ? `${event.title} (${event.userName})` 
+              : event.title
+            
+            return {
+              ...event,
+              title: displayTitle,
+            }
+          })}
           startAccessor="start"
           endAccessor="end"
           style={{ height: '100%', minHeight: '650px' }}

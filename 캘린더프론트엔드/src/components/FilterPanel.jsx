@@ -20,7 +20,7 @@ function FilterPanel({ filters, onFiltersChange, onClose }) {
   const resetFilters = () => {
     onFiltersChange({
       members: [],
-      eventTypes: ['VACATION', 'MEETING', 'OTHER'],
+      eventTypes: EVENT_TYPE_OPTIONS.map(opt => opt.value), // 모든 이벤트 타입 포함
     })
   }
 
@@ -28,8 +28,8 @@ function FilterPanel({ filters, onFiltersChange, onClose }) {
   const mockMembers = getMockMembers()
   const members = mockMembers.map((m) => ({ id: m.id, name: m.name }))
 
-  // 이벤트 타입은 영문 값 사용
-  const eventTypes = ['VACATION', 'MEETING', 'OTHER']
+  // 이벤트 타입은 EVENT_TYPE_OPTIONS에서 가져오기
+  const eventTypes = EVENT_TYPE_OPTIONS.map(opt => opt.value)
 
   return (
     <div className="card mb-6">

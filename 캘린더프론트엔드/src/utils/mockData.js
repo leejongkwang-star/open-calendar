@@ -238,11 +238,26 @@ export const getMockEvents = () => {
   const events = localStorage.getItem('mock-events')
   if (events) {
     const parsed = JSON.parse(events)
-    return parsed.map((event) => ({
-      ...event,
-      start: new Date(event.start),
-      end: new Date(event.end),
-    }))
+    return parsed.map((event) => {
+      const start = new Date(event.start)
+      const end = new Date(event.end)
+      
+      // react-big-calendar는 end 날짜를 exclusive로 처리하므로,
+      // 종료일까지 표시하려면 end를 종료일 다음 날 자정으로 설정해야 함
+      // 원본 endDate 저장 (수정 모달에서 사용하기 위해)
+      const originalEndDate = new Date(end)
+      
+      const endDate = new Date(end)
+      endDate.setDate(endDate.getDate() + 1) // 다음 날로 설정
+      endDate.setHours(0, 0, 0, 0) // 자정으로 설정
+      
+      return {
+        ...event,
+        start: start,
+        end: endDate, // 종료일 다음 날 자정 (캘린더 표시용)
+        originalEndDate: originalEndDate, // 원본 종료일 (수정 모달용)
+      }
+    })
   }
   return []
 }

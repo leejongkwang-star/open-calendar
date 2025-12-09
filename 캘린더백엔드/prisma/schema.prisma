@@ -118,8 +118,10 @@ model Event {
 }
 
 enum EventType {
-  VACATION  // 휴가
-  MEETING   // 회의
-  OTHER     // 기타
+  VACATION      // 휴가
+  MEETING       // 회의
+  TRAINING      // 연수
+  BUSINESS_TRIP // 출장
+  OTHER         // 기타
 }
 

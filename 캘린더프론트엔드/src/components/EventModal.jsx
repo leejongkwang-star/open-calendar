@@ -15,27 +15,110 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser }) {
 
   const isEditMode = event?.id
 
+  // 시간에 1시간 더하는 함수
+  const addOneHour = (timeStr) => {
+    if (!timeStr || !/^\d{2}:\d{2}$/.test(timeStr)) return '10:00'
+    const [hours, minutes] = timeStr.split(':').map(Number)
+    const date = new Date()
+    date.setHours(hours, minutes, 0, 0)
+    date.setHours(date.getHours() + 1)
+    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  }
+
   useEffect(() => {
     if (event) {
-      const start = event.start || new Date()
-      const end = event.end || new Date()
-      // 백엔드에서 받은 영문 값을 그대로 사용 (이미 변환됨)
+      // 수정 모드일 때
+      if (isEditMode) {
+        // 백엔드에서 받은 원본 startDate, endDate 사용 (DB 값과 동일)
+        // react-big-calendar용 변환된 start, end가 아닌 원본 값 사용
+        const dbStartDate = event.startDate ? new Date(event.startDate) : (event.start ? new Date(event.start) : new Date())
+        const dbEndDate = event.endDate ? new Date(event.endDate) : (event.end ? new Date(event.end) : new Date())
+        
+        // originalEndDate가 있으면 사용 (react-big-calendar용 변환 전 원본)
+        const end = event.originalEndDate ? new Date(event.originalEndDate) : dbEndDate
+        
+        // 수정 모드일 때 제목에서 사용자 이름 제거 (예: "제목 (이름)" → "제목")
+        let cleanTitle = event.title || ''
+        if (cleanTitle) {
+          // 제목 끝에 "(이름)" 형식이 있으면 제거
+          cleanTitle = cleanTitle.replace(/\s*\([^)]+\)\s*$/, '').trim()
+        }
+        
+        // 시간 포맷팅 (Date 객체에서 시간 추출)
+        const formatTime = (dateObj) => {
+          if (!dateObj) return '09:00'
+          const date = new Date(dateObj)
+          const hours = String(date.getHours()).padStart(2, '0')
+          const minutes = String(date.getMinutes()).padStart(2, '0')
+          return `${hours}:${minutes}`
+        }
+
+        // DB에 저장된 startDate, endDate에서 직접 시간 추출
+        // startTime, endTime이 별도로 있으면 사용, 없으면 startDate, endDate에서 추출
+        const startTime = event.startTime ? formatTime(event.startTime) : formatTime(dbStartDate)
+        const endTime = event.endTime ? formatTime(event.endTime) : formatTime(end)
+
+        setFormData({
+          title: cleanTitle,
+          startDate: formatDate(dbStartDate),
+          endDate: formatDate(end),
+          startTime: startTime,
+          endTime: endTime,
+          eventType: event.eventType || 'VACATION',
+          description: event.description || '',
+        })
+      } else {
+        // 신규 등록 시: 시작일을 선택한 날짜로 설정, 종료일도 시작일과 동일
+        const selectedDate = event?.start ? new Date(event.start) : new Date()
+        const startDateStr = formatDate(selectedDate)
+        
+        // 현재 시간을 가져와서 시작시간으로 설정 (하루 일정의 경우)
+        const now = new Date()
+        const currentHour = String(now.getHours()).padStart(2, '0')
+        const currentMinute = String(now.getMinutes()).padStart(2, '0')
+        const currentTime = `${currentHour}:${currentMinute}`
+        
+        // 하루 일정: 등록하는 시간을 시작시간으로, +1시간을 종료시간으로
+        const startTime = currentTime
+        const endTime = addOneHour(currentTime)
+        
+        setFormData({
+          title: '',
+          startDate: startDateStr,
+          endDate: startDateStr, // 종료일을 시작일과 동일하게 설정 (event.end 무시)
+          startTime: startTime,
+          endTime: endTime,
+          eventType: 'VACATION',
+          description: '',
+        })
+      }
+    } else {
+      // event가 없는 경우 (직접 모달 열기)
+      const today = new Date()
+      const startDateStr = formatDate(today)
+      const startTime = '09:00'
+      const endTime = addOneHour(startTime)
+      
       setFormData({
-        title: event.title || '',
-        startDate: formatDate(start),
-        endDate: formatDate(end),
-        startTime: event.startTime || '',
-        endTime: event.endTime || '',
-        eventType: event.eventType || 'VACATION',
-        description: event.description || '',
+        title: '',
+        startDate: startDateStr,
+        endDate: startDateStr,
+        startTime: startTime,
+        endTime: endTime,
+        eventType: 'VACATION',
+        description: '',
       })
     }
-  }, [event])
+  }, [event, isEditMode])
 
   const formatDate = (date) => {
     if (!date) return ''
     const d = new Date(date)
-    return d.toISOString().split('T')[0]
+    // 로컬 시간대를 사용하여 날짜 포맷팅 (UTC 변환으로 인한 날짜 오류 방지)
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
   }
 
   const handleSubmit = (e) => {
@@ -87,7 +170,37 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser }) {
               <input
                 type="date"
                 value={formData.startDate}
-                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                onChange={(e) => {
+                  const newStartDate = e.target.value
+                  // 시작일 변경 시 종료일이 시작일보다 이전이면 종료일도 동일하게 설정
+                  const newEndDate = newStartDate < formData.endDate ? newStartDate : formData.endDate
+                  
+                  // 날짜가 변경되면 시간 재설정
+                  let newStartTime = formData.startTime
+                  let newEndTime = formData.endTime
+                  
+                  if (newStartDate !== newEndDate) {
+                    // 여러 날짜 일정: 시작일 09시, 종료일 18시
+                    newStartTime = '09:00'
+                    newEndTime = '18:00'
+                  } else {
+                    // 하루 일정: 등록 시간을 시작시간으로, +1시간을 종료시간으로
+                    const now = new Date()
+                    const currentHour = String(now.getHours()).padStart(2, '0')
+                    const currentMinute = String(now.getMinutes()).padStart(2, '0')
+                    const currentTime = `${currentHour}:${currentMinute}`
+                    newStartTime = currentTime
+                    newEndTime = addOneHour(currentTime)
+                  }
+                  
+                  setFormData({ 
+                    ...formData, 
+                    startDate: newStartDate, 
+                    endDate: newEndDate,
+                    startTime: newStartTime,
+                    endTime: newEndTime,
+                  })
+                }}
                 className="input-field"
                 required
               />
@@ -99,36 +212,97 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser }) {
               <input
                 type="date"
                 value={formData.endDate}
-                onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                onChange={(e) => {
+                  const newEndDate = e.target.value
+                  // 종료일 변경 시: 시작일과 다른 날이면 시간 자동 설정 (여러 날짜 일정)
+                  let newStartTime = formData.startTime
+                  let newEndTime = formData.endTime
+                  
+                  if (newEndDate !== formData.startDate) {
+                    // 여러 날짜 일정: 시작일 09시, 종료일 18시
+                    newStartTime = '09:00'
+                    newEndTime = '18:00'
+                  } else {
+                    // 하루 일정으로 변경: 등록 시간을 시작시간으로, +1시간을 종료시간으로
+                    const now = new Date()
+                    const currentHour = String(now.getHours()).padStart(2, '0')
+                    const currentMinute = String(now.getMinutes()).padStart(2, '0')
+                    const currentTime = `${currentHour}:${currentMinute}`
+                    newStartTime = currentTime
+                    newEndTime = addOneHour(currentTime)
+                  }
+                  
+                  setFormData({ 
+                    ...formData, 
+                    endDate: newEndDate,
+                    startTime: newStartTime,
+                    endTime: newEndTime,
+                  })
+                }}
+                min={formData.startDate}
                 className="input-field"
                 required
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700">
                 <Clock className="w-4 h-4 inline mr-1" />
-                시작 시간
+                시간 <span className="text-red-500">*</span>
               </label>
-              <input
-                type="time"
-                value={formData.startTime}
-                onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                className="input-field"
-              />
+              <button
+                type="button"
+                onClick={() => {
+                  // 종일 버튼: 하루 일정이면 09:00-18:00, 여러 날 일정이면 시작일 09:00 종료일 18:00
+                  // 여러 날 일정은 기본적으로 종일 설정 (시작일 09:00, 종료일 18:00)
+                  setFormData({
+                    ...formData,
+                    startTime: '09:00',
+                    endTime: '18:00',
+                  })
+                }}
+                className="text-sm px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+              >
+                종일
+              </button>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                종료 시간
-              </label>
-              <input
-                type="time"
-                value={formData.endTime}
-                onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                className="input-field"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">
+                  시작 시간
+                </label>
+                  <input
+                    type="time"
+                    value={formData.startTime}
+                    onChange={(e) => {
+                      const newStartTime = e.target.value
+                      // 시작시간 변경 시: 하루 일정이면 종료시간 +1시간, 여러 날 일정이면 종료시간 18:00 유지
+                      let newEndTime = formData.endTime
+                      if (formData.startDate === formData.endDate) {
+                        // 하루 일정: 종료시간 자동으로 +1시간 설정
+                        newEndTime = addOneHour(newStartTime)
+                      }
+                      // 여러 날 일정: 종료시간은 18:00으로 유지
+                      setFormData({ ...formData, startTime: newStartTime, endTime: newEndTime })
+                    }}
+                    className="input-field"
+                    required
+                  />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">
+                  종료 시간
+                </label>
+                <input
+                  type="time"
+                  value={formData.endTime}
+                  onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                  className="input-field"
+                  required
+                />
+              </div>
             </div>
           </div>
 

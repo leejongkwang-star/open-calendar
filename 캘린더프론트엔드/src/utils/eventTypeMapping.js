@@ -2,6 +2,8 @@
 export const EVENT_TYPE_MAP = {
   VACATION: '휴가',
   MEETING: '회의',
+  TRAINING: '연수',
+  BUSINESS_TRIP: '출장',
   OTHER: '기타',
 }
 
@@ -10,6 +12,8 @@ export const toEnglishEventType = (koreanType) => {
   const reverseMap = {
     '휴가': 'VACATION',
     '회의': 'MEETING',
+    '연수': 'TRAINING',
+    '출장': 'BUSINESS_TRIP',
     '기타': 'OTHER',
   }
   return reverseMap[koreanType] || koreanType
@@ -24,6 +28,8 @@ export const toKoreanEventType = (englishType) => {
 export const EVENT_TYPE_OPTIONS = [
   { value: 'VACATION', label: '휴가' },
   { value: 'MEETING', label: '회의' },
+  { value: 'TRAINING', label: '연수' },
+  { value: 'BUSINESS_TRIP', label: '출장' },
   { value: 'OTHER', label: '기타' },
 ]
 

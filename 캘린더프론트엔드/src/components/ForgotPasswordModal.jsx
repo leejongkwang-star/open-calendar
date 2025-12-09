@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, Hash, Lock, AlertCircle, CheckCircle } from 'lucide-react'
 import { authAPI } from '../api/auth'
 
-function ForgotPasswordModal({ isOpen, onClose }) {
+function ForgotPasswordModal({ isOpen, onClose, initialEmployeeNumber = '' }) {
   const [step, setStep] = useState(1) // 1: 직원번호 확인, 2: 비밀번호 재설정
-  const [employeeNumber, setEmployeeNumber] = useState('')
+  const [employeeNumber, setEmployeeNumber] = useState(initialEmployeeNumber)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -12,10 +12,28 @@ function ForgotPasswordModal({ isOpen, onClose }) {
   const [success, setSuccess] = useState(false)
   const [userInfo, setUserInfo] = useState(null)
 
+  // 모달이 열릴 때 initialEmployeeNumber가 변경되면 업데이트
+  useEffect(() => {
+    if (isOpen && initialEmployeeNumber) {
+      setEmployeeNumber(initialEmployeeNumber)
+      setStep(1)
+      setError('')
+      setSuccess(false)
+      setUserInfo(null)
+      setNewPassword('')
+      setConfirmPassword('')
+    }
+  }, [isOpen, initialEmployeeNumber])
+
   if (!isOpen) return null
 
   const handleEmployeeNumberChange = (e) => {
-    const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)
+    // 입력값에서 영문과 숫자만 추출하고 대문자로 변환
+    let value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)
+    
+    // "#" 같은 특수문자 제거 (혹시 모를 경우를 대비)
+    value = value.replace(/#/g, '').trim()
+    
     setEmployeeNumber(value)
     setError('')
     setSuccess(false)
@@ -51,12 +69,21 @@ function ForgotPasswordModal({ isOpen, onClose }) {
     setLoading(true)
 
     try {
+      // 직원번호 정리 (혹시 모를 특수문자 제거)
+      const cleanEmployeeNumber = employeeNumber.toUpperCase().replace(/[^A-Z0-9]/g, '').trim()
+      
+      if (!cleanEmployeeNumber || cleanEmployeeNumber.length !== 6) {
+        setError('올바른 직원번호를 입력해주세요. (6자리 영문과 숫자 조합)')
+        setLoading(false)
+        return
+      }
+
       const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
       
       if (USE_MOCK) {
         // Mock 모드: 로컬 스토리지에서 확인
         const users = JSON.parse(localStorage.getItem('mock-users') || '[]')
-        const user = users.find((u) => u.employeeNumber.toUpperCase() === employeeNumber.toUpperCase())
+        const user = users.find((u) => u.employeeNumber.toUpperCase() === cleanEmployeeNumber.toUpperCase())
         
         if (user) {
           setUserInfo({
@@ -69,11 +96,11 @@ function ForgotPasswordModal({ isOpen, onClose }) {
         }
       } else {
         // 실제 API 호출 - 직원번호 확인
-        const response = await authAPI.checkEmployeeNumber(employeeNumber)
+        const response = await authAPI.checkEmployeeNumber(cleanEmployeeNumber)
         
-        if (response.exists) {
+        if (response && response.exists) {
           setUserInfo({
-            employeeNumber: employeeNumber.toUpperCase(),
+            employeeNumber: cleanEmployeeNumber,
           })
           setStep(2) // 비밀번호 재설정 단계로 이동
         } else {
@@ -82,7 +109,15 @@ function ForgotPasswordModal({ isOpen, onClose }) {
       }
     } catch (err) {
       console.error('직원번호 확인 실패:', err)
-      setError(err.response?.data?.message || '직원번호 확인 중 오류가 발생했습니다.')
+      
+      // 네트워크 오류 처리
+      if (!err.response) {
+        setError('서버에 연결할 수 없습니다. 백엔드 서버가 실행 중인지 확인해주세요.')
+      } else {
+        // 백엔드 에러 메시지 처리
+        const errorMessage = err.response?.data?.message || '직원번호 확인 중 오류가 발생했습니다.'
+        setError(errorMessage)
+      }
     } finally {
       setLoading(false)
     }
