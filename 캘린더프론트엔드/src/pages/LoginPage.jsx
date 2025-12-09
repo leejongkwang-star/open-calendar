@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/authStore'
 import { authAPI } from '../api/auth'
 import { mockLogin, loadMockData } from '../utils/mockData'
 import { Hash, Lock, AlertCircle } from 'lucide-react'
+import ForgotPasswordModal from '../components/ForgotPasswordModal'
 
 function LoginPage() {
   const [employeeNumber, setEmployeeNumber] = useState('')
@@ -11,6 +12,7 @@ function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
   
   const navigate = useNavigate()
   const { login } = useAuthStore()
@@ -59,6 +61,18 @@ function LoginPage() {
   const handleEmployeeNumberChange = (e) => {
     const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)
     setEmployeeNumber(value)
+    // 6자리 입력 완료 시 비밀번호 필드로 포커스 이동
+    if (value.length === 6 && validateEmployeeNumber(value)) {
+      document.getElementById('password')?.focus()
+    }
+  }
+
+  const handleEmployeeNumberKeyDown = (e) => {
+    // Enter 키 누르면 비밀번호 필드로 이동
+    if (e.key === 'Enter' && validateEmployeeNumber(employeeNumber)) {
+      e.preventDefault()
+      document.getElementById('password')?.focus()
+    }
   }
 
   return (
@@ -89,6 +103,7 @@ function LoginPage() {
                   type="text"
                   value={employeeNumber}
                   onChange={handleEmployeeNumberChange}
+                  onKeyDown={handleEmployeeNumberKeyDown}
                   className="input-field pl-10 uppercase"
                   placeholder="A1B2C3"
                   maxLength={6}
@@ -131,9 +146,13 @@ function LoginPage() {
                   로그인 상태 유지
                 </label>
               </div>
-              <a href="#" className="text-sm text-primary-600 hover:text-primary-700">
+              <button
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
+                className="text-sm text-primary-600 hover:text-primary-700"
+              >
                 비밀번호 찾기
-              </a>
+              </button>
             </div>
 
             <button
@@ -155,6 +174,12 @@ function LoginPage() {
           </div>
         </div>
       </div>
+
+      {/* 비밀번호 찾기 모달 */}
+      <ForgotPasswordModal
+        isOpen={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+      />
     </div>
   )
 }

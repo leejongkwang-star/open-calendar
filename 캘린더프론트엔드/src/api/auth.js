@@ -64,5 +64,11 @@ export const authAPI = {
     const response = await api.get('/auth/user-by-employee-number', { params: { employeeNumber } })
     return response.data
   },
+
+  // 비밀번호 재설정
+  resetPassword: async (employeeNumber, newPassword) => {
+    const response = await api.post('/auth/reset-password', { employeeNumber, newPassword })
+    return response.data
+  },
 }
 
