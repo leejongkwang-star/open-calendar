@@ -217,7 +217,9 @@ function CalendarPage() {
         setEvents(mockEvents)
       } else {
         // 실제 API 호출
-        const teamId = selectedTeamId || (teams.length > 0 ? teams[0].id : null)
+        // teamId를 null로 전송하여 모든 팀의 일정 조회 (공유 목적)
+        // 특정 팀을 선택한 경우에만 teamId 전송
+        const teamId = selectedTeamId || null
         const data = await eventsAPI.getEvents(teamId, null, null)
         // 날짜 형식 변환 (백엔드에서 Date 객체로 받음)
         // react-big-calendar는 end 날짜를 exclusive로 처리하므로,
@@ -245,13 +247,23 @@ function CalendarPage() {
             originalEndDate: originalEndDate, // 원본 종료일 (수정 모달용)
           }
         })
+        console.log('이벤트 로드 성공:', formattedEvents.length, '개')
         setEvents(formattedEvents)
       }
     } catch (error) {
       console.error('이벤트 로드 실패:', error)
-      // 에러 발생 시에도 모크 데이터 사용
-      const mockEvents = getMockEvents()
-      setEvents(mockEvents)
+      console.error('에러 상세:', error.response?.data || error.message)
+      setEvents([])
+      // 인증 오류인 경우 로그인 페이지로 리다이렉트
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        alert('인증이 만료되었습니다. 다시 로그인해주세요.')
+        setTimeout(() => {
+          window.location.href = '/login'
+        }, 1000)
+      } else {
+        const errorMessage = error.response?.data?.message || error.message || '일정을 불러오는데 실패했습니다.'
+        console.error('일정 로드 오류:', errorMessage)
+      }
     }
   }
 

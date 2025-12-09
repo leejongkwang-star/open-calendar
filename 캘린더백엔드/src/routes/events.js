@@ -26,22 +26,16 @@ router.get(
       const { teamId, startDate, endDate } = req.query
       const userId = req.user.id
 
-      // 사용자가 속한 팀 조회
-      const userTeams = await prisma.teamMember.findMany({
-        where: { userId },
-        select: { teamId: true },
-      })
-
-      const teamIds = userTeams.map((tm) => tm.teamId)
-
-      if (teamIds.length === 0) {
-        return res.json([])
-      }
-
       // 필터 조건 구성
-      const where = {
-        teamId: teamId ? parseInt(teamId) : { in: teamIds },
+      // 캘린더의 목적: 모든 팀의 일정을 공유하여 서로 일정을 알 수 있도록 함
+      const where = {}
+      
+      if (teamId) {
+        // 특정 팀 선택 시: 해당 팀의 일정만 조회
+        where.teamId = parseInt(teamId)
       }
+      // teamId가 없으면: 모든 팀의 일정 조회 (공유 목적)
+      // where에 teamId 조건을 추가하지 않으면 모든 팀의 일정이 조회됨
 
       if (startDate || endDate) {
         where.OR = []
@@ -80,20 +74,59 @@ router.get(
       })
 
       // react-big-calendar 형식으로 변환
-      const formattedEvents = events.map((event) => ({
-        id: event.id,
-        title: event.title,
-        start: event.startDate,
-        end: event.endDate,
-        startTime: event.startTime,
-        endTime: event.endTime,
-        eventType: event.eventType,
-        description: event.description,
-        userId: event.userId,
-        userName: event.user.name,
-        teamId: event.teamId,
-        teamName: event.team.name,
-      }))
+      // 이전 데이터 호환성: startTime/endTime이 별도로 있는 경우 startDate/endDate와 결합
+      const formattedEvents = events.map((event) => {
+        // startDate와 startTime 결합
+        let start = event.startDate
+        if (event.startTime && !event.startDate) {
+          // startDate가 없고 startTime만 있는 경우 (이전 데이터)
+          start = event.startTime
+        } else if (event.startDate && event.startTime && event.startDate.getTime() !== event.startTime.getTime()) {
+          // startDate와 startTime이 다를 경우 (이전 데이터: 날짜와 시간이 분리)
+          // startDate의 날짜 부분과 startTime의 시간 부분 결합
+          const date = new Date(event.startDate)
+          const time = new Date(event.startTime)
+          date.setHours(time.getHours(), time.getMinutes(), time.getSeconds(), time.getMilliseconds())
+          start = date
+        } else if (event.startDate) {
+          // 최신 데이터: startDate에 시간이 포함됨
+          start = event.startDate
+        }
+
+        // endDate와 endTime 결합
+        let end = event.endDate
+        if (event.endTime && !event.endDate) {
+          // endDate가 없고 endTime만 있는 경우 (이전 데이터)
+          end = event.endTime
+        } else if (event.endDate && event.endTime && event.endDate.getTime() !== event.endTime.getTime()) {
+          // endDate와 endTime이 다를 경우 (이전 데이터: 날짜와 시간이 분리)
+          // endDate의 날짜 부분과 endTime의 시간 부분 결합
+          const date = new Date(event.endDate)
+          const time = new Date(event.endTime)
+          date.setHours(time.getHours(), time.getMinutes(), time.getSeconds(), time.getMilliseconds())
+          end = date
+        } else if (event.endDate) {
+          // 최신 데이터: endDate에 시간이 포함됨
+          end = event.endDate
+        }
+
+        return {
+          id: event.id,
+          title: event.title,
+          start: start,
+          end: end,
+          startDate: start, // 원본 startDate 저장 (프론트엔드에서 사용)
+          endDate: end, // 원본 endDate 저장 (프론트엔드에서 사용)
+          startTime: event.startTime,
+          endTime: event.endTime,
+          eventType: event.eventType,
+          description: event.description,
+          userId: event.userId,
+          userName: event.user.name,
+          teamId: event.teamId,
+          teamName: event.team.name,
+        }
+      })
 
       res.json(formattedEvents)
     } catch (error) {
@@ -144,11 +177,38 @@ router.get('/:id', async (req, res, next) => {
       return res.status(403).json({ message: '이 이벤트에 접근할 권한이 없습니다.' })
     }
 
+    // 이전 데이터 호환성: startTime/endTime이 별도로 있는 경우 startDate/endDate와 결합
+    let start = event.startDate
+    if (event.startTime && !event.startDate) {
+      start = event.startTime
+    } else if (event.startDate && event.startTime && event.startDate.getTime() !== event.startTime.getTime()) {
+      const date = new Date(event.startDate)
+      const time = new Date(event.startTime)
+      date.setHours(time.getHours(), time.getMinutes(), time.getSeconds(), time.getMilliseconds())
+      start = date
+    } else if (event.startDate) {
+      start = event.startDate
+    }
+
+    let end = event.endDate
+    if (event.endTime && !event.endDate) {
+      end = event.endTime
+    } else if (event.endDate && event.endTime && event.endDate.getTime() !== event.endTime.getTime()) {
+      const date = new Date(event.endDate)
+      const time = new Date(event.endTime)
+      date.setHours(time.getHours(), time.getMinutes(), time.getSeconds(), time.getMilliseconds())
+      end = date
+    } else if (event.endDate) {
+      end = event.endDate
+    }
+
     res.json({
       id: event.id,
       title: event.title,
-      start: event.startDate,
-      end: event.endDate,
+      start: start,
+      end: end,
+      startDate: start,
+      endDate: end,
       startTime: event.startTime,
       endTime: event.endTime,
       eventType: event.eventType,
@@ -202,17 +262,21 @@ router.post(
         return res.status(400).json({ message: '시작일은 종료일보다 이전이어야 합니다.' })
       }
 
-      // 사용자가 해당 팀의 구성원인지 확인
-      // Supabase Pooler 모드 호환성을 위해 findFirst 사용
-      const teamMember = await prisma.teamMember.findFirst({
-        where: {
-          teamId: parseInt(teamId),
-          userId,
-        },
-      })
+      // 관리자가 아닌 경우에만 팀 구성원 확인
+      // 관리자는 모든 팀에 일정을 등록할 수 있음
+      if (req.user.role !== 'ADMIN') {
+        // 일반 사용자: 해당 팀의 구성원인지 확인
+        // Supabase Pooler 모드 호환성을 위해 findFirst 사용
+        const teamMember = await prisma.teamMember.findFirst({
+          where: {
+            teamId: parseInt(teamId),
+            userId,
+          },
+        })
 
-      if (!teamMember) {
-        return res.status(403).json({ message: '해당 팀의 구성원만 일정을 등록할 수 있습니다.' })
+        if (!teamMember) {
+          return res.status(403).json({ message: '해당 팀의 구성원만 일정을 등록할 수 있습니다.' })
+        }
       }
 
       // 날짜 문자열을 로컬 시간대로 파싱 (타임존 오류 방지)
@@ -554,11 +618,38 @@ router.put(
         },
       })
 
+      // 이전 데이터 호환성: startTime/endTime이 별도로 있는 경우 startDate/endDate와 결합
+      let start = updatedEvent.startDate
+      if (updatedEvent.startTime && !updatedEvent.startDate) {
+        start = updatedEvent.startTime
+      } else if (updatedEvent.startDate && updatedEvent.startTime && updatedEvent.startDate.getTime() !== updatedEvent.startTime.getTime()) {
+        const date = new Date(updatedEvent.startDate)
+        const time = new Date(updatedEvent.startTime)
+        date.setHours(time.getHours(), time.getMinutes(), time.getSeconds(), time.getMilliseconds())
+        start = date
+      } else if (updatedEvent.startDate) {
+        start = updatedEvent.startDate
+      }
+
+      let end = updatedEvent.endDate
+      if (updatedEvent.endTime && !updatedEvent.endDate) {
+        end = updatedEvent.endTime
+      } else if (updatedEvent.endDate && updatedEvent.endTime && updatedEvent.endDate.getTime() !== updatedEvent.endTime.getTime()) {
+        const date = new Date(updatedEvent.endDate)
+        const time = new Date(updatedEvent.endTime)
+        date.setHours(time.getHours(), time.getMinutes(), time.getSeconds(), time.getMilliseconds())
+        end = date
+      } else if (updatedEvent.endDate) {
+        end = updatedEvent.endDate
+      }
+
       res.json({
         id: updatedEvent.id,
         title: updatedEvent.title,
-        start: updatedEvent.startDate,
-        end: updatedEvent.endDate,
+        start: start,
+        end: end,
+        startDate: start,
+        endDate: end,
         startTime: updatedEvent.startTime,
         endTime: updatedEvent.endTime,
         eventType: updatedEvent.eventType,

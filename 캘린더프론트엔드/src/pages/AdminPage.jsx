@@ -27,6 +27,9 @@ function AdminPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [userSearchTerm, setUserSearchTerm] = useState('')
+  const [userRoleFilter, setUserRoleFilter] = useState('all')
+  const [userStatusFilter, setUserStatusFilter] = useState('all')
 
   useEffect(() => {
     // Mock 데이터 로드 제거 - 실제 API 사용
@@ -255,18 +258,29 @@ function AdminPage() {
       } else {
         const params = {}
         // 백엔드는 대문자('PENDING', 'APPROVED', 'REJECTED')를 기대하므로 변환
-        if (statusFilter !== 'all') params.status = statusFilter.toUpperCase()
+        if (userStatusFilter !== 'all') params.status = userStatusFilter.toUpperCase()
         // 백엔드는 대문자('ADMIN', 'MEMBER')를 기대하므로 변환
-        if (roleFilter !== 'all') params.role = roleFilter.toUpperCase()
-        if (searchTerm) params.search = searchTerm
+        if (userRoleFilter !== 'all') params.role = userRoleFilter.toUpperCase()
+        if (userSearchTerm) params.search = userSearchTerm
         
         const data = await authAPI.getAllUsers(params)
+        console.log('회원 목록 로드 성공:', data)
         setAllUsers(data || [])
       }
     } catch (error) {
       console.error('회원 목록 로드 실패:', error)
+      console.error('에러 상세:', error.response?.data || error.message)
       setAllUsers([])
-      alert('회원 목록을 불러오는데 실패했습니다.')
+      // 인증 오류인 경우 로그인 페이지로 리다이렉트
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        alert('인증이 만료되었습니다. 다시 로그인해주세요.')
+        setTimeout(() => {
+          window.location.href = '/login'
+        }, 1000)
+      } else {
+        const errorMessage = error.response?.data?.message || error.message || '회원 목록을 불러오는데 실패했습니다.'
+        alert(`회원 목록을 불러오는데 실패했습니다.\n\n${errorMessage}`)
+      }
     }
   }
 
@@ -321,13 +335,13 @@ function AdminPage() {
   })
 
   const filteredUsers = allUsers.filter((user) => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.employeeNumber.toUpperCase().includes(searchTerm.toUpperCase())
+    const matchesSearch = user.name.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+                         (user.employeeNumber && user.employeeNumber.toUpperCase().includes(userSearchTerm.toUpperCase()))
     // role, status 비교를 대소문자 구분 없이 처리
-    const matchesRole = roleFilter === 'all' || 
-      (user.role && user.role.toUpperCase() === roleFilter.toUpperCase())
-    const matchesStatus = statusFilter === 'all' || 
-      (user.status && user.status.toUpperCase() === statusFilter.toUpperCase())
+    const matchesRole = userRoleFilter === 'all' || 
+      (user.role && user.role.toUpperCase() === userRoleFilter.toUpperCase())
+    const matchesStatus = userStatusFilter === 'all' || 
+      (user.status && user.status.toUpperCase() === userStatusFilter.toUpperCase())
     return matchesSearch && matchesRole && matchesStatus
   })
 
@@ -459,6 +473,230 @@ function AdminPage() {
                           >
                             <XCircle className="w-4 h-4 mr-1" />
                             거부
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 회원 관리 탭 */}
+      {activeTab === 'users' && (
+        <div className="card">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">회원 관리</h2>
+            <p className="text-sm text-gray-600 mt-1">
+              전체 회원 {allUsers.length}명
+            </p>
+          </div>
+
+          {/* 검색 및 필터 */}
+          <div className="mb-4 space-y-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                value={userSearchTerm}
+                onChange={(e) => {
+                  setUserSearchTerm(e.target.value)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    loadAllUsers()
+                  }
+                }}
+                className="input-field pl-10"
+                placeholder="이름 또는 직원번호로 검색..."
+              />
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <span className="text-sm text-gray-600 self-center mr-2">권한:</span>
+              <button
+                onClick={() => {
+                  setUserRoleFilter('all')
+                  loadAllUsers()
+                }}
+                className={`px-3 py-1 rounded-md text-sm ${
+                  userRoleFilter === 'all'
+                    ? 'bg-primary-100 text-primary-700'
+                    : 'bg-gray-100 text-gray-700'
+                }`}
+              >
+                전체
+              </button>
+              <button
+                onClick={() => {
+                  setUserRoleFilter('admin')
+                  loadAllUsers()
+                }}
+                className={`px-3 py-1 rounded-md text-sm ${
+                  userRoleFilter === 'admin'
+                    ? 'bg-primary-100 text-primary-700'
+                    : 'bg-gray-100 text-gray-700'
+                }`}
+              >
+                관리자
+              </button>
+              <button
+                onClick={() => {
+                  setUserRoleFilter('member')
+                  loadAllUsers()
+                }}
+                className={`px-3 py-1 rounded-md text-sm ${
+                  userRoleFilter === 'member'
+                    ? 'bg-primary-100 text-primary-700'
+                    : 'bg-gray-100 text-gray-700'
+                }`}
+              >
+                일반
+              </button>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <span className="text-sm text-gray-600 self-center mr-2">상태:</span>
+              <button
+                onClick={() => {
+                  setUserStatusFilter('all')
+                  loadAllUsers()
+                }}
+                className={`px-3 py-1 rounded-md text-sm ${
+                  userStatusFilter === 'all'
+                    ? 'bg-primary-100 text-primary-700'
+                    : 'bg-gray-100 text-gray-700'
+                }`}
+              >
+                전체
+              </button>
+              <button
+                onClick={() => {
+                  setUserStatusFilter('approved')
+                  loadAllUsers()
+                }}
+                className={`px-3 py-1 rounded-md text-sm ${
+                  userStatusFilter === 'approved'
+                    ? 'bg-primary-100 text-primary-700'
+                    : 'bg-gray-100 text-gray-700'
+                }`}
+              >
+                승인됨
+              </button>
+              <button
+                onClick={() => {
+                  setUserStatusFilter('pending')
+                  loadAllUsers()
+                }}
+                className={`px-3 py-1 rounded-md text-sm ${
+                  userStatusFilter === 'pending'
+                    ? 'bg-primary-100 text-primary-700'
+                    : 'bg-gray-100 text-gray-700'
+                }`}
+              >
+                대기중
+              </button>
+              <button
+                onClick={() => {
+                  setUserStatusFilter('rejected')
+                  loadAllUsers()
+                }}
+                className={`px-3 py-1 rounded-md text-sm ${
+                  userStatusFilter === 'rejected'
+                    ? 'bg-primary-100 text-primary-700'
+                    : 'bg-gray-100 text-gray-700'
+                }`}
+              >
+                거부됨
+              </button>
+            </div>
+          </div>
+
+          {/* 회원 목록 테이블 */}
+          {filteredUsers.length === 0 ? (
+            <div className="text-center py-12">
+              <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500">회원이 없습니다.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      이름
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      직원번호
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      권한
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      상태
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      가입일
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                      작업
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {filteredUsers.map((user) => (
+                    <tr key={user.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm text-gray-900">{user.name}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 font-mono">
+                        {user.employeeNumber}
+                      </td>
+                      <td className="px-4 py-3">
+                        {user.role && user.role.toUpperCase() === 'ADMIN' ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+                            <Shield className="w-3 h-3 mr-1" />
+                            관리자
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            일반
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {user.status && user.status.toUpperCase() === 'APPROVED' ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            승인됨
+                          </span>
+                        ) : user.status && user.status.toUpperCase() === 'PENDING' ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            <Clock className="w-3 h-3 mr-1" />
+                            대기중
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            <XCircle className="w-3 h-3 mr-1" />
+                            거부됨
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {formatDate(user.createdAt)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => handleEditUser(user)}
+                            className="text-gray-400 hover:text-primary-600"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteUser(user.id)}
+                            className="text-gray-400 hover:text-red-600"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
