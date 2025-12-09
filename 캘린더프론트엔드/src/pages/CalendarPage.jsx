@@ -9,6 +9,7 @@ import { eventsAPI } from '../api/events'
 import { teamsAPI } from '../api/teams'
 import { getMockEvents, saveMockEvent, deleteMockEvent, loadMockData } from '../utils/mockData'
 import EventModal from '../components/EventModal'
+import EventPopup from '../components/EventPopup'
 import FilterPanel from '../components/FilterPanel'
 import { toKoreanEventType } from '../utils/eventTypeMapping'
 
@@ -25,6 +26,9 @@ function CalendarPage() {
   const [view, setView] = useState('month')
   const [showEventModal, setShowEventModal] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState(null)
+  const [showEventPopup, setShowEventPopup] = useState(false)
+  const [popupEvent, setPopupEvent] = useState(null)
+  const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 })
   const [showFilter, setShowFilter] = useState(false)
   const [filters, setFilters] = useState({
     members: [],
@@ -56,15 +60,86 @@ function CalendarPage() {
   }, [events, filters, view])
 
   // 이벤트 클릭 핸들러
-  const handleSelectEvent = (event) => {
-    setSelectedEvent(event)
-    setShowEventModal(true)
+  const handleSelectEvent = (event, e) => {
+    if (view === 'month') {
+      // 월뷰에서는 팝업 표시
+      if (e?.currentTarget) {
+        const rect = e.currentTarget.getBoundingClientRect()
+        setPopupPosition({
+          x: rect.left,
+          y: rect.bottom + 5, // 이벤트 아래 5px
+        })
+      } else {
+        // 이벤트 객체에서 위치 정보가 없는 경우 기본 위치
+        setPopupPosition({
+          x: window.innerWidth / 2 - 160,
+          y: window.innerHeight / 2 - 100,
+        })
+      }
+      setPopupEvent(event)
+      setShowEventPopup(true)
+    } else {
+      // 일/주 뷰에서는 기존 모달 표시
+      setSelectedEvent(event)
+      setShowEventModal(true)
+    }
   }
 
   // 날짜 클릭 핸들러
-  const handleSelectSlot = ({ start, end }) => {
-    setSelectedEvent({ start, end })
+  const handleSelectSlot = ({ start, end, slots, action }) => {
+    if (view === 'month') {
+      // 월뷰에서 빈 공간 클릭 시
+      // 해당 날짜에 본인의 일정이 있는지 확인
+      const clickedDate = new Date(start)
+      const hasMyEventsOnDate = filteredEvents.some(event => {
+        if (!event.start) return false
+        // 본인의 일정인지 확인 (userId 비교)
+        if (user?.id && event.userId !== user.id) {
+          return false
+        }
+        const eventDate = new Date(event.start)
+        return (
+          eventDate.getFullYear() === clickedDate.getFullYear() &&
+          eventDate.getMonth() === clickedDate.getMonth() &&
+          eventDate.getDate() === clickedDate.getDate()
+        )
+      })
+
+      if (hasMyEventsOnDate) {
+        // 본인의 일정이 있으면 일뷰로 이동
+        setSelectedDate(start)
+        setView('day')
+      } else {
+        // 본인의 일정이 없으면 일정 등록 모달 열기
+        setSelectedEvent({ start, end })
+        setShowEventModal(true)
+      }
+    } else {
+      // 일/주 뷰에서는 기존 동작 (일정 등록 모달)
+      setSelectedEvent({ start, end })
+      setShowEventModal(true)
+    }
+  }
+
+  // 팝업에서 편집 클릭
+  const handlePopupEdit = () => {
+    setSelectedEvent(popupEvent)
+    setShowEventPopup(false)
     setShowEventModal(true)
+  }
+
+  // 팝업에서 삭제 클릭
+  const handlePopupDelete = () => {
+    if (popupEvent?.id && window.confirm('이 일정을 삭제하시겠습니까?')) {
+      handleDeleteEvent(popupEvent.id)
+      setShowEventPopup(false)
+    }
+  }
+
+  // 팝업에서 이메일 클릭 (향후 구현)
+  const handlePopupEmail = () => {
+    // TODO: 이메일 기능 구현
+    alert('이메일 기능은 향후 구현 예정입니다.')
   }
 
   useEffect(() => {
@@ -732,6 +807,18 @@ function CalendarPage() {
           filters={filters}
           onFiltersChange={setFilters}
           onClose={() => setShowFilter(false)}
+        />
+      )}
+
+      {/* 이벤트 팝업 (월뷰용) */}
+      {showEventPopup && (
+        <EventPopup
+          event={popupEvent}
+          position={popupPosition}
+          onClose={() => setShowEventPopup(false)}
+          onEdit={handlePopupEdit}
+          onDelete={handlePopupDelete}
+          onEmail={handlePopupEmail}
         />
       )}
 

@@ -358,3 +358,17 @@
   width: 100% !important;
 }
 
+/* 이벤트 팝업 스타일 */
+.event-popup {
+  font-family: inherit;
+}
+
+.event-popup button {
+  transition: all 0.2s ease;
+}
+
+.event-popup button:hover {
+  background-color: #f3f4f6 !important;
+  border-radius: 4px;
+}
+
