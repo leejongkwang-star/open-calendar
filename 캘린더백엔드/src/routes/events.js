@@ -76,38 +76,74 @@ router.get(
       // react-big-calendar 형식으로 변환
       // 이전 데이터 호환성: startTime/endTime이 별도로 있는 경우 startDate/endDate와 결합
       const formattedEvents = events.map((event) => {
-        // startDate와 startTime 결합
-        let start = event.startDate
-        if (event.startTime && !event.startDate) {
-          // startDate가 없고 startTime만 있는 경우 (이전 데이터)
-          start = event.startTime
-        } else if (event.startDate && event.startTime && event.startDate.getTime() !== event.startTime.getTime()) {
-          // startDate와 startTime이 다를 경우 (이전 데이터: 날짜와 시간이 분리)
-          // startDate의 날짜 부분과 startTime의 시간 부분 결합
-          const date = new Date(event.startDate)
-          const time = new Date(event.startTime)
-          date.setHours(time.getHours(), time.getMinutes(), time.getSeconds(), time.getMilliseconds())
-          start = date
-        } else if (event.startDate) {
-          // 최신 데이터: startDate에 시간이 포함됨
-          start = event.startDate
+        // startDate와 startTime 결합 로직 (간소화)
+        let start = null
+        
+        if (event.startDate) {
+          // startDate가 있으면 우선 사용
+          start = new Date(event.startDate)
+          
+          // startTime이 있고 startDate가 자정(00:00:00)이면 startTime의 시간을 적용
+          if (event.startTime) {
+            const startDateObj = new Date(event.startDate)
+            const startTimeObj = new Date(event.startTime)
+            
+            // startDate가 자정이고 startTime이 다른 시간이면 결합
+            if (startDateObj.getHours() === 0 && startDateObj.getMinutes() === 0 && 
+                (startTimeObj.getHours() !== 0 || startTimeObj.getMinutes() !== 0)) {
+              startDateObj.setHours(startTimeObj.getHours(), startTimeObj.getMinutes(), 
+                                   startTimeObj.getSeconds(), startTimeObj.getMilliseconds())
+              start = startDateObj
+            }
+          }
+        } else if (event.startTime) {
+          // startDate가 없고 startTime만 있는 경우
+          start = new Date(event.startTime)
         }
 
-        // endDate와 endTime 결합
-        let end = event.endDate
-        if (event.endTime && !event.endDate) {
-          // endDate가 없고 endTime만 있는 경우 (이전 데이터)
-          end = event.endTime
-        } else if (event.endDate && event.endTime && event.endDate.getTime() !== event.endTime.getTime()) {
-          // endDate와 endTime이 다를 경우 (이전 데이터: 날짜와 시간이 분리)
-          // endDate의 날짜 부분과 endTime의 시간 부분 결합
-          const date = new Date(event.endDate)
-          const time = new Date(event.endTime)
-          date.setHours(time.getHours(), time.getMinutes(), time.getSeconds(), time.getMilliseconds())
-          end = date
-        } else if (event.endDate) {
-          // 최신 데이터: endDate에 시간이 포함됨
-          end = event.endDate
+        // endDate와 endTime 결합 로직 (간소화)
+        let end = null
+        
+        if (event.endDate) {
+          // endDate가 있으면 우선 사용
+          end = new Date(event.endDate)
+          
+          // endTime이 있고 endDate가 자정(00:00:00)이면 endTime의 시간을 적용
+          if (event.endTime) {
+            const endDateObj = new Date(event.endDate)
+            const endTimeObj = new Date(event.endTime)
+            
+            // endDate가 자정이고 endTime이 다른 시간이면 결합
+            if (endDateObj.getHours() === 0 && endDateObj.getMinutes() === 0 && 
+                (endTimeObj.getHours() !== 0 || endTimeObj.getMinutes() !== 0)) {
+              endDateObj.setHours(endTimeObj.getHours(), endTimeObj.getMinutes(), 
+                                 endTimeObj.getSeconds(), endTimeObj.getMilliseconds())
+              end = endDateObj
+            }
+          }
+        } else if (event.endTime) {
+          // endDate가 없고 endTime만 있는 경우
+          end = new Date(event.endTime)
+        }
+
+        // start나 end가 null이면 기본값 설정 (데이터 오류 방지)
+        if (!start) {
+          console.warn(`[이벤트 ${event.id}] startDate와 startTime이 모두 없습니다.`, {
+            id: event.id,
+            title: event.title,
+            startDate: event.startDate,
+            startTime: event.startTime,
+          })
+          start = new Date() // 기본값: 현재 시간
+        }
+        if (!end) {
+          console.warn(`[이벤트 ${event.id}] endDate와 endTime이 모두 없습니다.`, {
+            id: event.id,
+            title: event.title,
+            endDate: event.endDate,
+            endTime: event.endTime,
+          })
+          end = new Date(start.getTime() + 24 * 60 * 60 * 1000) // 기본값: start + 1일
         }
 
         return {
@@ -127,8 +163,46 @@ router.get(
           teamName: event.team.name,
         }
       })
+      
+      // null이나 undefined인 이벤트 제거
+      const validEvents = formattedEvents.filter(event => event && event.start && event.end)
+      
+      if (validEvents.length !== formattedEvents.length) {
+        console.warn(`[이벤트 필터링] ${formattedEvents.length}개 중 ${validEvents.length}개만 유효합니다.`)
+      }
+      
+      // 디버깅: 이벤트 개수와 모든 이벤트 정보 출력
+      console.log(`[이벤트 조회] DB에서 ${events.length}개 조회 → ${validEvents.length}개 유효 이벤트`)
+      
+      if (validEvents.length > 0) {
+        console.log(`[이벤트 조회] 모든 이벤트 목록:`)
+        validEvents.forEach((event, index) => {
+          console.log(`  [${index + 1}] ID: ${event.id}, 제목: ${event.title}, 시작: ${event.start}, 종료: ${event.end}`)
+        })
+      } else {
+        console.warn(`[이벤트 조회] 유효한 이벤트가 없습니다.`)
+        if (formattedEvents.length > 0) {
+          console.warn(`[이벤트 조회] formattedEvents 상세:`, formattedEvents.map(e => ({
+            id: e?.id,
+            title: e?.title,
+            hasStart: !!e?.start,
+            hasEnd: !!e?.end,
+            start: e?.start,
+            end: e?.end,
+          })))
+        }
+      }
 
-      res.json(formattedEvents)
+      // Date 객체를 ISO 문자열로 변환하여 JSON 직렬화 문제 방지
+      const serializedEvents = validEvents.map(event => ({
+        ...event,
+        start: event.start.toISOString(),
+        end: event.end.toISOString(),
+        startDate: event.startDate.toISOString(),
+        endDate: event.endDate.toISOString(),
+      }))
+
+      res.json(serializedEvents)
     } catch (error) {
       next(error)
     }

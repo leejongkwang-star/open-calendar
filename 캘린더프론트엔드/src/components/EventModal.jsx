@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { X, Trash2, Calendar, Clock, FileText, Users } from 'lucide-react'
 import { toEnglishEventType, toKoreanEventType, EVENT_TYPE_OPTIONS } from '../utils/eventTypeMapping'
 
-function EventModal({ event, onClose, onSave, onDelete, currentUser }) {
+function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, selectedTeamId }) {
   const [formData, setFormData] = useState({
     title: '',
     startDate: '',
@@ -11,6 +11,7 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser }) {
     endTime: '',
     eventType: 'VACATION',
     description: '',
+    teamId: null,
   })
 
   const isEditMode = event?.id
@@ -66,6 +67,7 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser }) {
           endTime: endTime,
           eventType: event.eventType || 'VACATION',
           description: event.description || '',
+          teamId: event.teamId || selectedTeamId || (teams && teams.length > 0 ? teams[0].id : null),
         })
       } else {
         // 신규 등록 시: 시작일을 선택한 날짜로 설정, 종료일도 시작일과 동일
@@ -90,6 +92,7 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser }) {
           endTime: endTime,
           eventType: 'VACATION',
           description: '',
+          teamId: selectedTeamId || (teams && teams.length > 0 ? teams[0].id : null),
         })
       }
     } else {
@@ -107,6 +110,7 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser }) {
         endTime: endTime,
         eventType: 'VACATION',
         description: '',
+        teamId: selectedTeamId || (teams && teams.length > 0 ? teams[0].id : null),
       })
     }
   }, [event, isEditMode])
@@ -306,22 +310,46 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser }) {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              일정 유형 <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={formData.eventType}
-              onChange={(e) => setFormData({ ...formData, eventType: e.target.value })}
-              className="input-field"
-              required
-            >
-              {EVENT_TYPE_OPTIONS.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                일정 유형 <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.eventType}
+                onChange={(e) => setFormData({ ...formData, eventType: e.target.value })}
+                className="input-field"
+                required
+              >
+                {EVENT_TYPE_OPTIONS.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Users className="w-4 h-4 inline mr-1" />
+                팀 <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.teamId || ''}
+                onChange={(e) => setFormData({ ...formData, teamId: parseInt(e.target.value) })}
+                className="input-field"
+                required
+              >
+                {teams && teams.length > 0 ? (
+                  teams.map(team => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">팀을 선택하세요</option>
+                )}
+              </select>
+            </div>
           </div>
 
           <div>

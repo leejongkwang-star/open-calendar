@@ -62,10 +62,12 @@ function CalendarPage() {
   }, [])
 
   useEffect(() => {
-    if (selectedTeamId || teams.length > 0) {
+    // 팀 목록이 로드되면 이벤트 조회
+    // 모든 팀의 일정을 항상 조회하므로 selectedTeamId와 무관하게 로드
+    if (teams.length > 0 || !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true') {
       loadEvents()
     }
-  }, [selectedTeamId, teams])
+  }, [teams]) // selectedTeamId 의존성 제거 (모든 팀의 일정을 항상 조회하므로)
 
   // 팀 목록 로드
   const loadTeams = async () => {
@@ -76,16 +78,14 @@ function CalendarPage() {
         // 모크 모드: 로컬 스토리지 사용
         const mockTeams = JSON.parse(localStorage.getItem('mockTeams') || '[]')
         setTeams(mockTeams)
-        if (mockTeams.length > 0 && !selectedTeamId) {
-          setSelectedTeamId(mockTeams[0].id)
-        }
+        // selectedTeamId는 변경하지 않음 (권한 변경 등으로 인한 팀 ID 변경 방지)
+        // 모든 팀의 일정을 조회하므로 selectedTeamId가 없어도 문제없음
       } else {
         // 실제 API 호출
         const data = await teamsAPI.getTeams()
         setTeams(data)
-        if (data.length > 0 && !selectedTeamId) {
-          setSelectedTeamId(data[0].id)
-        }
+        // selectedTeamId는 변경하지 않음 (권한 변경 등으로 인한 팀 ID 변경 방지)
+        // 모든 팀의 일정을 조회하므로 selectedTeamId가 없어도 문제없음
       }
     } catch (error) {
       console.error('팀 로드 실패:', error)
@@ -97,7 +97,7 @@ function CalendarPage() {
     try {
       const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
       
-      // teamId 설정 (이벤트에 teamId가 없으면 현재 선택된 팀 사용)
+      // teamId 설정 (이벤트 데이터에서 teamId 우선 사용, 없으면 현재 선택된 팀 사용)
       const teamId = eventData.teamId || selectedEvent?.teamId || selectedTeamId
       
       if (!teamId && !USE_MOCK) {
@@ -175,12 +175,14 @@ function CalendarPage() {
       console.error('이벤트 저장 실패:', error)
       const errorMessage = error.response?.data?.message || error.message || '이벤트 저장에 실패했습니다.'
       alert(errorMessage)
-      // 인증 오류인 경우 로그인 페이지로 리다이렉트
-      if (error.response?.status === 401 || error.response?.status === 403) {
+      // 인증 오류(401)만 로그인 페이지로 리다이렉트
+      // 403(권한 없음)은 권한 부족이지 인증 실패가 아니므로 리다이렉트하지 않음
+      if (error.response?.status === 401) {
         setTimeout(() => {
           window.location.href = '/login'
         }, 2000)
       }
+      // 403 오류는 권한 부족이므로 에러 메시지만 표시하고 모달은 유지
     }
   }
 
@@ -202,7 +204,15 @@ function CalendarPage() {
       setSelectedEvent(null)
     } catch (error) {
       console.error('이벤트 삭제 실패:', error)
-      alert('이벤트 삭제에 실패했습니다.')
+      const errorMessage = error.response?.data?.message || error.message || '이벤트 삭제에 실패했습니다.'
+      alert(errorMessage)
+      // 인증 오류(401)만 로그인 페이지로 리다이렉트
+      // 403(권한 없음)은 권한 부족이지 인증 실패가 아니므로 리다이렉트하지 않음
+      if (error.response?.status === 401) {
+        setTimeout(() => {
+          window.location.href = '/login'
+        }, 2000)
+      }
     }
   }
 
@@ -217,45 +227,84 @@ function CalendarPage() {
         setEvents(mockEvents)
       } else {
         // 실제 API 호출
-        // teamId를 null로 전송하여 모든 팀의 일정 조회 (공유 목적)
-        // 특정 팀을 선택한 경우에만 teamId 전송
-        const teamId = selectedTeamId || null
-        const data = await eventsAPI.getEvents(teamId, null, null)
+        // 모든 팀의 일정을 공유하여 표시하므로 teamId를 항상 null로 전송
+        // (특정 팀을 선택한 경우에도 모든 팀의 일정을 보여줌)
+        const data = await eventsAPI.getEvents(null, null, null)
         // 날짜 형식 변환 (백엔드에서 Date 객체로 받음)
         // react-big-calendar는 end 날짜를 exclusive로 처리하므로,
         // 종료일까지 표시하려면 end를 종료일 다음 날 자정으로 설정해야 함
-        const formattedEvents = data.map(event => {
-          // 백엔드에서 받은 원본 startDate, endDate 사용
-          const start = event.start ? new Date(event.start) : new Date()
-          const end = event.end ? new Date(event.end) : new Date()
+        console.log('[프론트엔드] 백엔드에서 받은 원본 데이터:', data)
+        console.log('[프론트엔드] 받은 이벤트 개수:', data?.length || 0)
+        
+        const formattedEvents = (data || [])
+          .map((event, index) => {
+            // 백엔드에서 받은 원본 startDate, endDate 사용 (ISO 문자열로 받음)
+            let start = null
+            let end = null
+            
+            try {
+              // ISO 문자열을 Date 객체로 변환
+              start = event.start ? new Date(event.start) : null
+              end = event.end ? new Date(event.end) : null
+              
+              // 유효한 날짜인지 확인
+              if (start && isNaN(start.getTime())) {
+                console.warn(`[이벤트 ${event.id}] 유효하지 않은 start 날짜:`, event.start, event)
+                return null
+              }
+              if (end && isNaN(end.getTime())) {
+                console.warn(`[이벤트 ${event.id}] 유효하지 않은 end 날짜:`, event.end, event)
+                return null
+              }
+              
+              // start나 end가 없으면 제외
+              if (!start || !end) {
+                console.warn(`[이벤트 ${event.id}] 날짜 정보가 없음:`, { start, end, event })
+                return null
+              }
+              
+              // 원본 endDate 저장 (수정 모달에서 사용하기 위해)
+              const originalEndDate = new Date(end)
+              
+              // endDate를 다음 날 자정으로 설정 (종료일까지 포함하여 표시)
+              // 예: 12월 9일 ~ 12월 10일 → end를 12월 11일 00:00:00으로 설정
+              const endDate = new Date(end)
+              endDate.setDate(endDate.getDate() + 1) // 다음 날로 설정
+              endDate.setHours(0, 0, 0, 0) // 자정으로 설정
+              
+              return {
+                ...event,
+                startDate: start, // 원본 startDate 저장
+                endDate: end, // 원본 endDate 저장
+                start: start, // 캘린더 표시용 start
+                end: endDate, // 종료일 다음 날 자정 (캘린더 표시용)
+                originalEndDate: originalEndDate, // 원본 종료일 (수정 모달용)
+              }
+            } catch (error) {
+              console.error(`[이벤트 ${event?.id || index}] 날짜 파싱 오류:`, error, event)
+              return null
+            }
+          })
+          .filter(event => event !== null) // null인 이벤트 제거
           
-          // 원본 endDate 저장 (수정 모달에서 사용하기 위해)
-          const originalEndDate = new Date(end)
-          
-          // endDate를 다음 날 자정으로 설정 (종료일까지 포함하여 표시)
-          // 예: 12월 9일 ~ 12월 10일 → end를 12월 11일 00:00:00으로 설정
-          const endDate = new Date(end)
-          endDate.setDate(endDate.getDate() + 1) // 다음 날로 설정
-          endDate.setHours(0, 0, 0, 0) // 자정으로 설정
-          
-          return {
-            ...event,
-            startDate: start, // 원본 startDate 저장
-            endDate: end, // 원본 endDate 저장
-            start: start, // 캘린더 표시용 start
-            end: endDate, // 종료일 다음 날 자정 (캘린더 표시용)
-            originalEndDate: originalEndDate, // 원본 종료일 (수정 모달용)
-          }
-        })
-        console.log('이벤트 로드 성공:', formattedEvents.length, '개')
+        console.log('[프론트엔드] 이벤트 로드 성공:', formattedEvents.length, '개')
+        if (formattedEvents.length > 0) {
+          console.log('[프론트엔드] 모든 이벤트 목록:')
+          formattedEvents.forEach((event, index) => {
+            console.log(`  [${index + 1}] ID: ${event.id}, 제목: ${event.title}, 시작: ${event.start}, 종료: ${event.end}`)
+          })
+        } else {
+          console.warn('[프론트엔드] 유효한 이벤트가 없습니다.')
+        }
         setEvents(formattedEvents)
       }
     } catch (error) {
       console.error('이벤트 로드 실패:', error)
       console.error('에러 상세:', error.response?.data || error.message)
       setEvents([])
-      // 인증 오류인 경우 로그인 페이지로 리다이렉트
-      if (error.response?.status === 401 || error.response?.status === 403) {
+      // 인증 오류(401)만 로그인 페이지로 리다이렉트
+      // 403(권한 없음)은 권한 부족이지 인증 실패가 아니므로 리다이렉트하지 않음
+      if (error.response?.status === 401) {
         alert('인증이 만료되었습니다. 다시 로그인해주세요.')
         setTimeout(() => {
           window.location.href = '/login'
@@ -432,6 +481,8 @@ function CalendarPage() {
           onSave={handleSaveEvent}
           onDelete={handleDeleteEvent}
           currentUser={user}
+          teams={teams}
+          selectedTeamId={selectedTeamId}
         />
       )}
     </div>
