@@ -266,18 +266,30 @@ function CalendarPage() {
               // 원본 endDate 저장 (수정 모달에서 사용하기 위해)
               const originalEndDate = new Date(end)
               
-              // endDate를 다음 날 자정으로 설정 (종료일까지 포함하여 표시)
-              // 예: 12월 9일 ~ 12월 10일 → end를 12월 11일 00:00:00으로 설정
-              const endDate = new Date(end)
-              endDate.setDate(endDate.getDate() + 1) // 다음 날로 설정
-              endDate.setHours(0, 0, 0, 0) // 자정으로 설정
+              // DB에서 받은 원본 endDate 사용 (백엔드에서 DB 원본 값 전송)
+              // endDate는 ISO 문자열로 오므로 UTC 기준으로 날짜 추출 (타임존 문제 방지)
+              const dbEndDate = event.endDate ? new Date(event.endDate) : end
+              
+              // UTC 기준으로 날짜 추출 (타임존 변환 없이)
+              // 예: "2025-12-31T18:00:00.000Z" → 12월 31일
+              // getUTCFullYear(), getUTCMonth(), getUTCDate() 사용
+              const endYear = dbEndDate.getUTCFullYear()
+              const endMonth = dbEndDate.getUTCMonth()
+              const endDay = dbEndDate.getUTCDate()
+              
+              // 종료일 다음 날 00:00:00으로 설정 (종료일까지만 표시)
+              // react-big-calendar는 end를 exclusive로 처리하므로
+              // end가 종료일 다음 날이면 종료일까지만 표시됨
+              // 로컬 시간대로 생성 (캘린더 표시용)
+              // 예: 종료일 12월 31일 → end = 1월 1일 00:00:00 → 12월 31일까지만 표시
+              const displayEnd = new Date(endYear, endMonth, endDay + 1, 0, 0, 0, 0)
               
               return {
                 ...event,
                 startDate: start, // 원본 startDate 저장
                 endDate: end, // 원본 endDate 저장
                 start: start, // 캘린더 표시용 start
-                end: endDate, // 종료일 다음 날 자정 (캘린더 표시용)
+                end: displayEnd, // 캘린더 표시용 end (하루 일정은 당일 23:59:59, 여러 날은 다음 날 00:00:00)
                 originalEndDate: originalEndDate, // 원본 종료일 (수정 모달용)
               }
             } catch (error) {

@@ -146,13 +146,16 @@ router.get(
           end = new Date(start.getTime() + 24 * 60 * 60 * 1000) // 기본값: start + 1일
         }
 
+        // DB 원본 날짜 저장 (프론트엔드에서 실제 종료일 계산용)
+        const originalEndDate = event.endDate ? new Date(event.endDate) : end
+        
         return {
           id: event.id,
           title: event.title,
-          start: start,
-          end: end,
-          startDate: start, // 원본 startDate 저장 (프론트엔드에서 사용)
-          endDate: end, // 원본 endDate 저장 (프론트엔드에서 사용)
+          start: start, // 계산된 start (startDate + startTime 결합)
+          end: end, // 계산된 end (endDate + endTime 결합)
+          startDate: event.startDate ? new Date(event.startDate) : start, // DB 원본 startDate
+          endDate: originalEndDate, // DB 원본 endDate (프론트엔드에서 종료일 계산용)
           startTime: event.startTime,
           endTime: event.endTime,
           eventType: event.eventType,
@@ -194,13 +197,29 @@ router.get(
       }
 
       // Date 객체를 ISO 문자열로 변환하여 JSON 직렬화 문제 방지
-      const serializedEvents = validEvents.map(event => ({
-        ...event,
-        start: event.start.toISOString(),
-        end: event.end.toISOString(),
-        startDate: event.startDate.toISOString(),
-        endDate: event.endDate.toISOString(),
-      }))
+      const serializedEvents = validEvents.map(event => {
+        const serialized = {
+          ...event,
+          start: event.start.toISOString(),
+          end: event.end.toISOString(),
+          startDate: event.startDate.toISOString(),
+          endDate: event.endDate.toISOString(),
+        }
+        
+        // 디버깅: 특정 이벤트 로그
+        if (event.id === 14) {
+          const rawEvent = events.find(e => e.id === 14)
+          console.log('[백엔드 이벤트 14]', {
+            'DB 원본 endDate (Prisma raw)': rawEvent?.endDate,
+            'formattedEvents의 endDate': event.endDate,
+            '계산된 end': event.end,
+            '직렬화된 endDate': serialized.endDate,
+            '직렬화된 end': serialized.end,
+          })
+        }
+        
+        return serialized
+      })
 
       res.json(serializedEvents)
     } catch (error) {
