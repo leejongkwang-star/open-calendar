@@ -85,15 +85,9 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, sele
         const selectedDate = event?.start ? new Date(event.start) : new Date()
         const startDateStr = formatDate(selectedDate)
         
-        // 현재 시간을 가져와서 시작시간으로 설정 (하루 일정의 경우)
-        const now = new Date()
-        const currentHour = String(now.getHours()).padStart(2, '0')
-        const currentMinute = String(now.getMinutes()).padStart(2, '0')
-        const currentTime = `${currentHour}:${currentMinute}`
-        
-        // 하루 일정: 등록하는 시간을 시작시간으로, +1시간을 종료시간으로
-        const startTime = currentTime
-        const endTime = addOneHour(currentTime)
+        // 신규 등록 시 기본적으로 종일 설정 (09:00-18:00)
+        const startTime = '09:00'
+        const endTime = '18:00'
         
         setFormData({
           title: '',

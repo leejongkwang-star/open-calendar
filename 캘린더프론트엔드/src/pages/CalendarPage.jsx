@@ -63,19 +63,45 @@ function CalendarPage() {
   const handleSelectEvent = (event, e) => {
     if (view === 'month') {
       // 월뷰에서는 팝업 표시
-      if (e?.currentTarget) {
-        const rect = e.currentTarget.getBoundingClientRect()
-        setPopupPosition({
-          x: rect.left,
-          y: rect.bottom + 5, // 이벤트 아래 5px
+      // react-big-calendar는 이벤트 객체만 전달하므로
+      // DOM 요소를 직접 찾아서 위치 계산
+      let popupX = window.innerWidth / 2 - 160
+      let popupY = window.innerHeight / 2 - 100
+      
+      // 이벤트 요소를 찾아서 위치 계산
+      // setTimeout을 사용하여 DOM이 렌더링된 후 찾기
+      setTimeout(() => {
+        const eventTitle = event.title?.replace(/\s*\([^)]+\)\s*$/, '') || event.title || ''
+        const eventElements = document.querySelectorAll('.rbc-event')
+        
+        eventElements.forEach(el => {
+          const elText = el.textContent || ''
+          // 이벤트 제목이 포함된 요소 찾기
+          if (eventTitle && elText.includes(eventTitle)) {
+            const rect = el.getBoundingClientRect()
+            popupX = rect.left
+            popupY = rect.bottom + 5 // 이벤트 아래 5px
+            
+            // 화면 경계 체크
+            if (popupX + 320 > window.innerWidth) {
+              popupX = window.innerWidth - 320 - 10
+            }
+            if (popupY + 200 > window.innerHeight) {
+              popupY = rect.top - 200 - 5 // 이벤트 위로 표시
+            }
+            if (popupX < 10) popupX = 10
+            if (popupY < 10) popupY = 10
+            
+            setPopupPosition({ x: popupX, y: popupY })
+          }
         })
-      } else {
-        // 이벤트 객체에서 위치 정보가 없는 경우 기본 위치
-        setPopupPosition({
-          x: window.innerWidth / 2 - 160,
-          y: window.innerHeight / 2 - 100,
-        })
-      }
+        
+        // 요소를 찾지 못한 경우 기본 위치 사용
+        if (popupX === window.innerWidth / 2 - 160) {
+          setPopupPosition({ x: popupX, y: popupY })
+        }
+      }, 0)
+      
       setPopupEvent(event)
       setShowEventPopup(true)
     } else {
@@ -91,18 +117,33 @@ function CalendarPage() {
       // 월뷰에서 빈 공간 클릭 시
       // 해당 날짜에 본인의 일정이 있는지 확인
       const clickedDate = new Date(start)
+      
+      // user가 없으면 본인 일정 확인 불가
+      if (!user?.id) {
+        // user가 없으면 일정 등록 모달 열기
+        setSelectedEvent({ start, end })
+        setShowEventModal(true)
+        return
+      }
+      
       const hasMyEventsOnDate = filteredEvents.some(event => {
         if (!event.start) return false
         // 본인의 일정인지 확인 (userId 비교)
-        if (user?.id && event.userId !== user.id) {
+        if (event.userId !== user.id) {
           return false
         }
-        const eventDate = new Date(event.start)
-        return (
-          eventDate.getFullYear() === clickedDate.getFullYear() &&
-          eventDate.getMonth() === clickedDate.getMonth() &&
-          eventDate.getDate() === clickedDate.getDate()
-        )
+        
+        // 다중 날짜 이벤트 처리: 시작일과 종료일 사이에 클릭한 날짜가 있는지 확인
+        const eventStart = new Date(event.start)
+        const eventEnd = event.end ? new Date(event.end) : eventStart
+        
+        // 날짜만 비교 (시간 제외)
+        const clickedDateOnly = new Date(clickedDate.getFullYear(), clickedDate.getMonth(), clickedDate.getDate())
+        const eventStartOnly = new Date(eventStart.getFullYear(), eventStart.getMonth(), eventStart.getDate())
+        const eventEndOnly = new Date(eventEnd.getFullYear(), eventEnd.getMonth(), eventEnd.getDate())
+        
+        // 클릭한 날짜가 이벤트 기간 내에 있는지 확인
+        return clickedDateOnly >= eventStartOnly && clickedDateOnly <= eventEndOnly
       })
 
       if (hasMyEventsOnDate) {
@@ -130,7 +171,8 @@ function CalendarPage() {
 
   // 팝업에서 삭제 클릭
   const handlePopupDelete = () => {
-    if (popupEvent?.id && window.confirm('이 일정을 삭제하시겠습니까?')) {
+    if (popupEvent?.id) {
+      // handleDeleteEvent 내부에서 확인 다이얼로그를 표시하므로 여기서는 확인 제거
       handleDeleteEvent(popupEvent.id)
       setShowEventPopup(false)
     }

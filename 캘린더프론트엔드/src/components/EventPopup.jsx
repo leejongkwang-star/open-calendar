@@ -251,7 +251,9 @@ function EventPopup({ event, position, onClose, onEdit, onDelete, onEmail }) {
                   marginTop: '8px',
                 }}
               >
-                <span style={{ fontWeight: '500' }}>{event.userName.toUpperCase()}</span>
+                <span style={{ fontWeight: '500' }}>
+                  {String(event.userName || '').toUpperCase()}
+                </span>
               </div>
             )}
 
