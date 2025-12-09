@@ -33,7 +33,7 @@ function CalendarPage() {
 
   // 필터링된 이벤트
   const filteredEvents = useMemo(() => {
-    return events.filter((event) => {
+    const filtered = events.filter((event) => {
       if (filters.members.length > 0 && !filters.members.includes(event.userId)) {
         return false
       }
@@ -42,7 +42,18 @@ function CalendarPage() {
       }
       return true
     })
-  }, [events, filters])
+    
+    // 일/주 뷰에서 겹치는 이벤트를 세로로 정렬하기 위해 시간 순서로 정렬
+    if (view === 'day' || view === 'week') {
+      return filtered.sort((a, b) => {
+        const startA = a.start ? new Date(a.start).getTime() : 0
+        const startB = b.start ? new Date(b.start).getTime() : 0
+        return startA - startB
+      })
+    }
+    
+    return filtered
+  }, [events, filters, view])
 
   // 이벤트 클릭 핸들러
   const handleSelectEvent = (event) => {
@@ -244,8 +255,39 @@ function CalendarPage() {
             
             try {
               // ISO 문자열을 Date 객체로 변환
-              start = event.start ? new Date(event.start) : null
-              end = event.end ? new Date(event.end) : null
+              // 백엔드에서 UTC ISO 문자열로 전송 (예: "2025-12-09T09:00:00.000Z")
+              // UTC 시간을 로컬 시간으로 해석하여 Date 객체 생성 (모달 시간과 일치시키기 위해)
+              if (event.start) {
+                const utcStartDate = new Date(event.start)
+                // UTC 시간 추출
+                const startYear = utcStartDate.getUTCFullYear()
+                const startMonth = utcStartDate.getUTCMonth()
+                const startDay = utcStartDate.getUTCDate()
+                const startHours = utcStartDate.getUTCHours()
+                const startMinutes = utcStartDate.getUTCMinutes()
+                const startSeconds = utcStartDate.getUTCSeconds()
+                const startMilliseconds = utcStartDate.getUTCMilliseconds()
+                // UTC 시간을 로컬 시간으로 해석하여 Date 객체 생성
+                start = new Date(startYear, startMonth, startDay, startHours, startMinutes, startSeconds, startMilliseconds)
+              } else {
+                start = null
+              }
+              
+              if (event.end) {
+                const utcEndDate = new Date(event.end)
+                // UTC 시간 추출
+                const endYear = utcEndDate.getUTCFullYear()
+                const endMonth = utcEndDate.getUTCMonth()
+                const endDay = utcEndDate.getUTCDate()
+                const endHours = utcEndDate.getUTCHours()
+                const endMinutes = utcEndDate.getUTCMinutes()
+                const endSeconds = utcEndDate.getUTCSeconds()
+                const endMilliseconds = utcEndDate.getUTCMilliseconds()
+                // UTC 시간을 로컬 시간으로 해석하여 Date 객체 생성
+                end = new Date(endYear, endMonth, endDay, endHours, endMinutes, endSeconds, endMilliseconds)
+              } else {
+                end = null
+              }
               
               // 유효한 날짜인지 확인
               if (start && isNaN(start.getTime())) {
@@ -267,29 +309,47 @@ function CalendarPage() {
               const originalEndDate = new Date(end)
               
               // DB에서 받은 원본 endDate 사용 (백엔드에서 DB 원본 값 전송)
-              // endDate는 ISO 문자열로 오므로 UTC 기준으로 날짜 추출 (타임존 문제 방지)
-              const dbEndDate = event.endDate ? new Date(event.endDate) : end
+              // endDate는 ISO 문자열로 오므로 UTC 시간을 로컬 시간으로 해석
+              let dbEndDate = null
+              if (event.endDate) {
+                const utcEndDate = new Date(event.endDate)
+                // UTC 시간 추출
+                const endDateYear = utcEndDate.getUTCFullYear()
+                const endDateMonth = utcEndDate.getUTCMonth()
+                const endDateDay = utcEndDate.getUTCDate()
+                const endDateHours = utcEndDate.getUTCHours()
+                const endDateMinutes = utcEndDate.getUTCMinutes()
+                const endDateSeconds = utcEndDate.getUTCSeconds()
+                const endDateMilliseconds = utcEndDate.getUTCMilliseconds()
+                // UTC 시간을 로컬 시간으로 해석하여 Date 객체 생성
+                dbEndDate = new Date(endDateYear, endDateMonth, endDateDay, endDateHours, endDateMinutes, endDateSeconds, endDateMilliseconds)
+              } else {
+                dbEndDate = end
+              }
               
-              // UTC 기준으로 날짜 추출 (타임존 변환 없이)
-              // 예: "2025-12-31T18:00:00.000Z" → 12월 31일
-              // getUTCFullYear(), getUTCMonth(), getUTCDate() 사용
-              const endYear = dbEndDate.getUTCFullYear()
-              const endMonth = dbEndDate.getUTCMonth()
-              const endDay = dbEndDate.getUTCDate()
+              // 로컬 시간 기준으로 날짜 추출 (이미 로컬 시간으로 변환된 상태)
+              // 예: UTC "2025-12-31T18:00:00.000Z" → 로컬 "2025-12-31 18:00:00"
+              const endYear = dbEndDate.getFullYear()
+              const endMonth = dbEndDate.getMonth()
+              const endDay = dbEndDate.getDate()
+              const endHours = dbEndDate.getHours()
+              const endMinutes = dbEndDate.getMinutes()
+              const endSeconds = dbEndDate.getSeconds()
               
-              // 종료일 다음 날 00:00:00으로 설정 (종료일까지만 표시)
               // react-big-calendar는 end를 exclusive로 처리하므로
-              // end가 종료일 다음 날이면 종료일까지만 표시됨
-              // 로컬 시간대로 생성 (캘린더 표시용)
-              // 예: 종료일 12월 31일 → end = 1월 1일 00:00:00 → 12월 31일까지만 표시
-              const displayEnd = new Date(endYear, endMonth, endDay + 1, 0, 0, 0, 0)
+              // 일 뷰에서는 실제 end 시간에 1분을 더하여 정확한 위치에 표시 (예: 18:00 → 18:01로 설정하여 18:00까지 표시)
+              // 월 뷰에서는 종료일 다음 날 00:00:00으로 설정 (종료일까지만 표시)
+              // end 시간이 있으면 실제 end 시간 + 1분, 없으면 종료일 다음 날 00:00:00
+              const displayEnd = (endHours !== 0 || endMinutes !== 0 || endSeconds !== 0)
+                ? new Date(endYear, endMonth, endDay, endHours, endMinutes + 1, 0) // 일 뷰: 실제 end 시간 + 1분 (18:00 → 18:01)
+                : new Date(endYear, endMonth, endDay + 1, 0, 0, 0, 0) // 월 뷰: 종료일 다음 날 00:00:00
               
               return {
                 ...event,
                 startDate: start, // 원본 startDate 저장
                 endDate: end, // 원본 endDate 저장
                 start: start, // 캘린더 표시용 start
-                end: displayEnd, // 캘린더 표시용 end (하루 일정은 당일 23:59:59, 여러 날은 다음 날 00:00:00)
+                end: displayEnd, // 캘린더 표시용 end (일 뷰: 실제 end 시간, 월 뷰: 종료일 다음 날 00:00:00)
                 originalEndDate: originalEndDate, // 원본 종료일 (수정 모달용)
               }
             } catch (error) {
