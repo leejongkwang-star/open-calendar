@@ -310,7 +310,9 @@
 
 /* 일/주 뷰에서 각 이벤트를 전체 너비로 강제 */
 .rbc-day-view .rbc-time-slot .rbc-event,
-.rbc-week-view .rbc-time-slot .rbc-event {
+.rbc-week-view .rbc-time-slot .rbc-event,
+.rbc-day-view .rbc-day-slot .rbc-event,
+.rbc-week-view .rbc-day-slot .rbc-event {
   position: absolute !important;
   width: calc(100% - 8px) !important;
   left: 4px !important;
@@ -318,5 +320,41 @@
   max-width: calc(100% - 8px) !important;
   margin-left: 0 !important;
   margin-right: 0 !important;
+  z-index: 1 !important;
+}
+
+/* react-big-calendar의 겹침 계산을 무시하기 위한 강제 스타일 */
+.rbc-day-view .rbc-day-slot .rbc-events-container,
+.rbc-week-view .rbc-day-slot .rbc-events-container {
+  position: relative !important;
+  display: block !important;
+}
+
+/* 모든 이벤트 세그먼트를 전체 너비로 강제 */
+.rbc-day-view .rbc-event-segment,
+.rbc-week-view .rbc-event-segment {
+  width: calc(100% - 8px) !important;
+  left: 4px !important;
+  right: 4px !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  position: absolute !important;
+}
+
+/* 이벤트 래퍼도 전체 너비로 */
+.rbc-day-view .rbc-event-content-wrapper,
+.rbc-week-view .rbc-event-content-wrapper {
+  width: calc(100% - 8px) !important;
+  left: 4px !important;
+  right: 4px !important;
+  position: absolute !important;
+}
+
+/* 이벤트 레이블과 콘텐츠도 조정 */
+.rbc-day-view .rbc-event-label,
+.rbc-week-view .rbc-event-label,
+.rbc-day-view .rbc-event-content,
+.rbc-week-view .rbc-event-content {
+  width: 100% !important;
 }
 

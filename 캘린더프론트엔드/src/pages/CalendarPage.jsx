@@ -80,6 +80,159 @@ function CalendarPage() {
     }
   }, [teams]) // selectedTeamId 의존성 제거 (모든 팀의 일정을 항상 조회하므로)
 
+  // 일/주 뷰에서 겹치는 이벤트를 세로로 재배치
+  useEffect(() => {
+    if (view !== 'day' && view !== 'week') return
+
+    let animationFrameId = null
+    let intervalId = null
+
+    const rearrangeEvents = () => {
+      // requestAnimationFrame으로 실행
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId)
+      }
+      
+      animationFrameId = requestAnimationFrame(() => {
+        // 모든 날짜 슬롯을 찾아서 각 슬롯의 이벤트를 세로로 재배치
+        const daySlots = document.querySelectorAll('.rbc-day-view .rbc-day-slot, .rbc-week-view .rbc-day-slot')
+        
+        daySlots.forEach((daySlot) => {
+          const eventsContainer = daySlot.querySelector('.rbc-events-container')
+          if (!eventsContainer) return
+
+          // 실제 이벤트 요소만 찾기 (세그먼트가 아닌 최상위 이벤트)
+          const allEventElements = Array.from(eventsContainer.children)
+          const events = allEventElements
+            .filter(el => el.classList.contains('rbc-event') || el.querySelector('.rbc-event'))
+            .map(el => {
+              const eventEl = el.classList.contains('rbc-event') ? el : el.querySelector('.rbc-event')
+              if (!eventEl) return null
+              
+              const rect = eventEl.getBoundingClientRect()
+              const containerRect = eventsContainer.getBoundingClientRect()
+              const relativeTop = rect.top - containerRect.top
+              
+              return {
+                element: eventEl,
+                container: el,
+                top: relativeTop,
+                height: rect.height || 30,
+                originalTop: parseFloat(eventEl.style.top) || relativeTop,
+              }
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.originalTop - b.originalTop)
+
+          if (events.length <= 1) return
+
+          // 각 이벤트를 전체 너비로 설정하고 세로로 배치
+          events.forEach((eventData, index) => {
+            const event = eventData.element
+            const container = eventData.container
+            
+            // 컨테이너와 이벤트 모두 전체 너비로 설정
+            container.style.width = 'calc(100% - 8px)'
+            container.style.left = '4px'
+            container.style.right = '4px'
+            container.style.maxWidth = 'calc(100% - 8px)'
+            container.style.marginLeft = '0'
+            container.style.marginRight = '0'
+            container.style.position = 'absolute'
+            
+            event.style.width = 'calc(100% - 8px)'
+            event.style.left = '4px'
+            event.style.right = '4px'
+            event.style.maxWidth = 'calc(100% - 8px)'
+            event.style.marginLeft = '0'
+            event.style.marginRight = '0'
+            event.style.position = 'absolute'
+            
+            // 모든 세그먼트와 래퍼도 처리
+            const segments = container.querySelectorAll('.rbc-event-segment, .rbc-event-content-wrapper')
+            segments.forEach(segment => {
+              segment.style.width = 'calc(100% - 8px)'
+              segment.style.left = '4px'
+              segment.style.right = '4px'
+              segment.style.position = 'absolute'
+            })
+            
+            // 이전 이벤트와 겹치는지 확인하여 위치 조정
+            let newTop = eventData.originalTop
+            if (index > 0) {
+              const prevEvent = events[index - 1]
+              const prevTop = parseFloat(prevEvent.element.style.top) || prevEvent.originalTop
+              const prevHeight = prevEvent.element.offsetHeight || prevEvent.height
+              const prevBottom = prevTop + prevHeight
+              
+              // 이전 이벤트와 겹치면 아래로 배치
+              if (newTop < prevBottom) {
+                newTop = prevBottom + 2 // 2px 간격
+              }
+            }
+            
+            // top 위치 설정
+            container.style.top = `${newTop}px`
+            event.style.top = `${newTop}px`
+            
+            // 세그먼트도 같은 위치로
+            segments.forEach(segment => {
+              segment.style.top = `${newTop}px`
+            })
+          })
+        })
+      })
+    }
+
+    // 초기 실행
+    const initialTimeout = setTimeout(() => {
+      rearrangeEvents()
+    }, 100)
+
+    // 주기적으로 재배치 (react-big-calendar가 계속 위치를 변경할 수 있음)
+    intervalId = setInterval(() => {
+      rearrangeEvents()
+    }, 200)
+
+    // 이벤트나 뷰가 변경될 때마다 재배치
+    const observer = new MutationObserver(() => {
+      rearrangeEvents()
+    })
+    
+    const calendarElement = document.querySelector('.rbc-calendar')
+    if (calendarElement) {
+      observer.observe(calendarElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style', 'class'],
+      })
+    }
+
+    // 스크롤 시에도 재배치
+    const scrollHandler = () => {
+      rearrangeEvents()
+    }
+    const timeContent = document.querySelector('.rbc-time-content')
+    if (timeContent) {
+      timeContent.addEventListener('scroll', scrollHandler, { passive: true })
+    }
+
+    return () => {
+      clearTimeout(initialTimeout)
+      if (intervalId) {
+        clearInterval(intervalId)
+      }
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId)
+      }
+      observer.disconnect()
+      if (timeContent) {
+        timeContent.removeEventListener('scroll', scrollHandler)
+      }
+    }
+  }, [view, filteredEvents])
+
   // 팀 목록 로드
   const loadTeams = async () => {
     try {
@@ -430,20 +583,119 @@ function CalendarPage() {
       fontWeight: '600',
     }
     
+    // 일/주 뷰에서 겹치는 이벤트를 세로로 배치하기 위해 전체 너비로 설정
+    const isDayOrWeekView = view === 'day' || view === 'week'
+    
     return {
       style: {
         ...style,
         borderRadius: '6px',
         border: `2px solid ${style.borderColor}`,
+        borderLeftWidth: '5px',
         padding: '6px 10px',
         fontSize: '13px',
         boxShadow: '0 2px 4px rgba(0, 0, 0, 0.15)',
         minHeight: '24px',
         display: 'flex',
         alignItems: 'center',
+        // 일/주 뷰에서 전체 너비로 설정하여 세로 정렬 강제
+        ...(isDayOrWeekView && {
+          width: 'calc(100% - 8px) !important',
+          left: '4px !important',
+          right: '4px !important',
+          maxWidth: 'calc(100% - 8px) !important',
+        }),
       },
     }
   }
+
+  // 커스텀 이벤트 컴포넌트 (세로 정렬을 위해)
+  const CustomEventComponent = ({ event, title, ...props }) => {
+    const colors = {
+      VACATION: {
+        backgroundColor: '#2563eb',
+        borderColor: '#1e40af',
+        color: '#ffffff',
+      },
+      MEETING: {
+        backgroundColor: '#059669',
+        borderColor: '#047857',
+        color: '#ffffff',
+      },
+      TRAINING: {
+        backgroundColor: '#ea580c',
+        borderColor: '#c2410c',
+        color: '#ffffff',
+      },
+      BUSINESS_TRIP: {
+        backgroundColor: '#0891b2',
+        borderColor: '#0e7490',
+        color: '#ffffff',
+      },
+      OTHER: {
+        backgroundColor: '#7c3aed',
+        borderColor: '#6d28d9',
+        color: '#ffffff',
+      },
+    }
+    
+    const style = colors[event?.eventType] || {
+      backgroundColor: '#4b5563',
+      borderColor: '#374151',
+      color: '#ffffff',
+    }
+    
+    // 일/주 뷰에서만 세로 정렬 적용
+    const isDayOrWeekView = view === 'day' || view === 'week'
+    
+    return (
+      <div
+        style={{
+          backgroundColor: style.backgroundColor,
+          borderColor: style.borderColor,
+          color: style.color,
+          border: `2px solid ${style.borderColor}`,
+          borderLeftWidth: '5px',
+          borderRadius: '6px',
+          padding: '6px 10px',
+          fontSize: '13px',
+          fontWeight: '600',
+          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.15)',
+          minHeight: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          whiteSpace: 'normal',
+          wordWrap: 'break-word',
+          overflow: 'visible',
+          // 일/주 뷰에서 전체 너비로 설정하여 세로 정렬 강제
+          ...(isDayOrWeekView && {
+            width: 'calc(100% - 8px)',
+            left: '4px',
+            right: '4px',
+            maxWidth: 'calc(100% - 8px)',
+            position: 'absolute',
+          }),
+        }}
+        onClick={(e) => {
+          e.stopPropagation()
+          handleSelectEvent(event)
+        }}
+      >
+        {title || event?.title}
+      </div>
+    )
+  }
+
+  // 커스텀 컴포넌트 설정
+  const calendarComponents = useMemo(() => {
+    // 일/주 뷰에서만 커스텀 이벤트 컴포넌트 사용
+    if (view === 'day' || view === 'week') {
+      return {
+        event: CustomEventComponent,
+      }
+    }
+    return {}
+  }, [view])
 
   return (
     <div className="h-full">
@@ -511,6 +763,7 @@ function CalendarPage() {
           onSelectSlot={handleSelectSlot}
           selectable
           eventPropGetter={eventStyleGetter}
+          components={calendarComponents}
           popup
           showMultiDayTimes
           step={60}
