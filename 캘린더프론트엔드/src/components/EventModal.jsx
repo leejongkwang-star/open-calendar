@@ -30,8 +30,7 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, sele
     if (event) {
       // 수정 모드일 때
       if (isEditMode) {
-        // 백엔드에서 받은 원본 startDate, endDate 사용 (DB 값과 동일)
-        // react-big-calendar용 변환된 start, end가 아닌 원본 값 사용
+        // 백엔드에서 받은 원본 startDate, endDate 사용 (DB 값과 동일, UTC 형식)
         const dbStartDate = event.startDate ? new Date(event.startDate) : (event.start ? new Date(event.start) : new Date())
         const dbEndDate = event.endDate ? new Date(event.endDate) : (event.end ? new Date(event.end) : new Date())
         
@@ -45,26 +44,38 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, sele
           cleanTitle = cleanTitle.replace(/\s*\([^)]+\)\s*$/, '').trim()
         }
         
-        // 시간 포맷팅 (Date 객체에서 시간 추출)
+        // 시간 포맷팅 (UTC 기준으로 시간 추출 - DB 값 그대로 표시)
         const formatTime = (dateObj) => {
           if (!dateObj) return '09:00'
           const date = new Date(dateObj)
-          const hours = String(date.getHours()).padStart(2, '0')
-          const minutes = String(date.getMinutes()).padStart(2, '0')
+          // UTC 시간 사용 (DB에 저장된 시간 그대로)
+          const hours = String(date.getUTCHours()).padStart(2, '0')
+          const minutes = String(date.getUTCMinutes()).padStart(2, '0')
           return `${hours}:${minutes}`
         }
 
-        // DB에 저장된 startDate, endDate에서 직접 시간 추출
+        // 날짜 포맷팅 (UTC 기준으로 날짜 추출 - DB 값 그대로 표시)
+        const formatDateUTC = (dateObj) => {
+          if (!dateObj) return ''
+          const date = new Date(dateObj)
+          // UTC 기준으로 날짜 추출 (타임존 변환으로 인한 날짜 오류 방지)
+          const year = date.getUTCFullYear()
+          const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+          const day = String(date.getUTCDate()).padStart(2, '0')
+          return `${year}-${month}-${day}`
+        }
+
+        // DB에 저장된 startDate, endDate에서 직접 시간 추출 (UTC 기준)
         // startTime, endTime이 별도로 있으면 사용, 없으면 startDate, endDate에서 추출
         const startTime = event.startTime ? formatTime(event.startTime) : formatTime(dbStartDate)
         const endTime = event.endTime ? formatTime(event.endTime) : formatTime(end)
 
         setFormData({
           title: cleanTitle,
-          startDate: formatDate(dbStartDate),
-          endDate: formatDate(end),
-          startTime: startTime,
-          endTime: endTime,
+          startDate: formatDateUTC(dbStartDate), // UTC 기준 날짜
+          endDate: formatDateUTC(end), // UTC 기준 날짜 (DB 원본 값)
+          startTime: startTime, // UTC 기준 시간 (DB 원본 값)
+          endTime: endTime, // UTC 기준 시간 (DB 원본 값)
           eventType: event.eventType || 'VACATION',
           description: event.description || '',
           teamId: event.teamId || selectedTeamId || (teams && teams.length > 0 ? teams[0].id : null),
