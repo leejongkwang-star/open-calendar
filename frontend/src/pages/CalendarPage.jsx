@@ -178,7 +178,7 @@ function CalendarPage() {
     }
   }
 
-  // 팝업에서 메시지 클릭 (카카오톡 링크)
+  // 팝업에서 메시지 클릭 (SMS 링크)
   const handlePopupMessage = () => {
     if (!popupEvent || !user) return
     
@@ -205,21 +205,22 @@ function CalendarPage() {
       return
     }
     
-    // 카카오톡 링크 생성
-    const kakaoLink = `kakaotalk://chat?phone=${cleanPhone}`
+    // 일정 정보로 기본 메시지 템플릿 생성
+    const eventTitle = popupEvent.title || '일정'
+    const eventDate = popupEvent.startDate 
+      ? new Date(popupEvent.startDate).toLocaleDateString('ko-KR', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        })
+      : ''
+    const defaultMessage = `"${eventTitle}" 일정에 대해 문의드립니다.${eventDate ? ` (${eventDate})` : ''}`
     
-    // 카카오톡 링크 열기
-    window.location.href = kakaoLink
+    // SMS 링크 생성 (메시지 본문 포함)
+    const smsLink = `sms:${cleanPhone}?body=${encodeURIComponent(defaultMessage)}`
     
-    // 카카오톡이 설치되어 있지 않으면 SMS로 대체 (1초 후)
-    setTimeout(() => {
-      // 카카오톡이 열리지 않았을 가능성이 있으므로 SMS 링크 제공
-      const smsLink = `sms:${cleanPhone}`
-      const useSMS = confirm('카카오톡을 열 수 없습니다. SMS로 전환하시겠습니까?')
-      if (useSMS) {
-        window.location.href = smsLink
-      }
-    }, 1000)
+    // SMS 링크 열기
+    window.location.href = smsLink
   }
 
   useEffect(() => {

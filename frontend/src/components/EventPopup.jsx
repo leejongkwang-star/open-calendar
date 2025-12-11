@@ -160,7 +160,7 @@ function EventPopup({ event, position, onClose, onEdit, onDelete, onMessage }) {
             alignItems: 'center',
             color: '#6b7280',
           }}
-          title="카카오톡"
+          title="SMS"
         >
           <MessageCircle size={16} />
         </button>
