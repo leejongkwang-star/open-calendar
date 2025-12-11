@@ -62,6 +62,15 @@ router.get(
               name: true,
               employeeNumber: true,
             },
+            include: {
+              teams: {
+                select: {
+                  phone: true,
+                  teamId: true,
+                },
+                take: 1, // 첫 번째 팀의 전화번호만
+              },
+            },
           },
           team: {
             select: {
@@ -162,6 +171,7 @@ router.get(
           description: event.description,
           userId: event.userId,
           userName: event.user.name,
+          phone: event.user.teams?.[0]?.phone || null, // 전화번호 추가
           teamId: event.teamId,
           teamName: event.team.name,
         }

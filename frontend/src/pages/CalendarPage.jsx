@@ -178,10 +178,48 @@ function CalendarPage() {
     }
   }
 
-  // 팝업에서 이메일 클릭 (향후 구현)
-  const handlePopupEmail = () => {
-    // TODO: 이메일 기능 구현
-    alert('이메일 기능은 향후 구현 예정입니다.')
+  // 팝업에서 메시지 클릭 (카카오톡 링크)
+  const handlePopupMessage = () => {
+    if (!popupEvent || !user) return
+    
+    // 자신에게 메시지를 보낼 수 없도록 체크
+    if (popupEvent.userId === user.id) {
+      alert('자신에게는 메시지를 보낼 수 없습니다.')
+      return
+    }
+    
+    // 일정 등록자의 전화번호 가져오기
+    // resource 객체에서 phone 정보 가져오기
+    let phoneNumber = popupEvent.resource?.phone || popupEvent.phone || popupEvent.userPhone
+    
+    if (!phoneNumber) {
+      alert('일정 등록자의 연락처 정보가 없습니다.')
+      return
+    }
+    
+    // 전화번호에서 숫자만 추출
+    const cleanPhone = phoneNumber.replace(/[^0-9]/g, '')
+    
+    if (cleanPhone.length < 10) {
+      alert('유효한 전화번호가 아닙니다.')
+      return
+    }
+    
+    // 카카오톡 링크 생성
+    const kakaoLink = `kakaotalk://chat?phone=${cleanPhone}`
+    
+    // 카카오톡 링크 열기
+    window.location.href = kakaoLink
+    
+    // 카카오톡이 설치되어 있지 않으면 SMS로 대체 (1초 후)
+    setTimeout(() => {
+      // 카카오톡이 열리지 않았을 가능성이 있으므로 SMS 링크 제공
+      const smsLink = `sms:${cleanPhone}`
+      const useSMS = confirm('카카오톡을 열 수 없습니다. SMS로 전환하시겠습니까?')
+      if (useSMS) {
+        window.location.href = smsLink
+      }
+    }, 1000)
   }
 
   useEffect(() => {
@@ -860,7 +898,7 @@ function CalendarPage() {
           onClose={() => setShowEventPopup(false)}
           onEdit={handlePopupEdit}
           onDelete={handlePopupDelete}
-          onEmail={handlePopupEmail}
+          onMessage={handlePopupMessage}
         />
       )}
 

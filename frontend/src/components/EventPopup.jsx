@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react'
-import { Edit, Trash2, Mail, MoreVertical, X } from 'lucide-react'
+import { Edit, Trash2, MessageCircle, MoreVertical, X } from 'lucide-react'
 import { toKoreanEventType } from '../utils/eventTypeMapping'
 
-function EventPopup({ event, position, onClose, onEdit, onDelete, onEmail }) {
+function EventPopup({ event, position, onClose, onEdit, onDelete, onMessage }) {
   const popupRef = useRef(null)
 
   // 외부 클릭 감지
@@ -150,7 +150,7 @@ function EventPopup({ event, position, onClose, onEdit, onDelete, onEmail }) {
           <Trash2 size={16} />
         </button>
         <button
-          onClick={onEmail}
+          onClick={onMessage}
           style={{
             background: 'none',
             border: 'none',
@@ -160,9 +160,9 @@ function EventPopup({ event, position, onClose, onEdit, onDelete, onEmail }) {
             alignItems: 'center',
             color: '#6b7280',
           }}
-          title="이메일"
+          title="카카오톡"
         >
-          <Mail size={16} />
+          <MessageCircle size={16} />
         </button>
         <button
           style={{
