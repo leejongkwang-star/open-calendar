@@ -222,6 +222,168 @@ function CalendarPage() {
     window.location.href = smsLink
   }
 
+  // 이벤트 로드 (먼저 정의하여 다른 함수들이 참조할 수 있도록)
+  const loadEvents = useCallback(async () => {
+    try {
+      // 모든 팀의 일정을 공유하여 표시하므로 teamId를 항상 null로 전송
+      // (특정 팀을 선택한 경우에도 모든 팀의 일정을 보여줌)
+      const data = await eventsAPI.getEvents(null, null, null)
+      // 날짜 형식 변환 (백엔드에서 Date 객체로 받음)
+      // react-big-calendar는 end 날짜를 exclusive로 처리하므로,
+      // 종료일까지 표시하려면 end를 종료일 다음 날 자정으로 설정해야 함
+      
+      const formattedEvents = (data || [])
+        .map((event, index) => {
+          // 백엔드에서 받은 원본 startDate, endDate 사용 (ISO 문자열로 받음)
+          let start = null
+          let end = null
+          
+          try {
+            // ISO 문자열을 Date 객체로 변환
+            // 백엔드에서 UTC ISO 문자열로 전송 (예: "2025-12-09T09:00:00.000Z")
+            // UTC 시간을 로컬 시간으로 해석하여 Date 객체 생성 (모달 시간과 일치시키기 위해)
+            if (event.start) {
+              const utcStartDate = new Date(event.start)
+              // UTC 시간 추출
+              const startYear = utcStartDate.getUTCFullYear()
+              const startMonth = utcStartDate.getUTCMonth()
+              const startDay = utcStartDate.getUTCDate()
+              const startHours = utcStartDate.getUTCHours()
+              const startMinutes = utcStartDate.getUTCMinutes()
+              const startSeconds = utcStartDate.getUTCSeconds()
+              const startMilliseconds = utcStartDate.getUTCMilliseconds()
+              // UTC 시간을 로컬 시간으로 해석하여 Date 객체 생성
+              start = new Date(startYear, startMonth, startDay, startHours, startMinutes, startSeconds, startMilliseconds)
+            } else {
+              start = null
+            }
+            
+            if (event.end) {
+              const utcEndDate = new Date(event.end)
+              // UTC 시간 추출
+              const endYear = utcEndDate.getUTCFullYear()
+              const endMonth = utcEndDate.getUTCMonth()
+              const endDay = utcEndDate.getUTCDate()
+              const endHours = utcEndDate.getUTCHours()
+              const endMinutes = utcEndDate.getUTCMinutes()
+              const endSeconds = utcEndDate.getUTCSeconds()
+              const endMilliseconds = utcEndDate.getUTCMilliseconds()
+              // UTC 시간을 로컬 시간으로 해석하여 Date 객체 생성
+              end = new Date(endYear, endMonth, endDay, endHours, endMinutes, endSeconds, endMilliseconds)
+            } else {
+              end = null
+            }
+            
+            // 유효한 날짜인지 확인
+            if (start && isNaN(start.getTime())) {
+              if (import.meta.env.DEV) {
+                console.warn(`[이벤트 ${event.id}] 유효하지 않은 start 날짜:`, event.start)
+              }
+              return null
+            }
+            if (end && isNaN(end.getTime())) {
+              if (import.meta.env.DEV) {
+                console.warn(`[이벤트 ${event.id}] 유효하지 않은 end 날짜:`, event.end)
+              }
+              return null
+            }
+            
+            // start나 end가 없으면 제외
+            if (!start || !end) {
+              if (import.meta.env.DEV) {
+                console.warn(`[이벤트 ${event.id}] 날짜 정보가 없음`)
+              }
+              return null
+            }
+            
+            // 원본 endDate 저장 (수정 모달에서 사용하기 위해)
+            const originalEndDate = new Date(end)
+            
+            // DB에서 받은 원본 endDate 사용 (백엔드에서 DB 원본 값 전송)
+            // endDate는 ISO 문자열로 오므로 UTC 시간을 로컬 시간으로 해석
+            let dbEndDate = null
+            if (event.endDate) {
+              const utcEndDate = new Date(event.endDate)
+              // UTC 시간 추출
+              const endDateYear = utcEndDate.getUTCFullYear()
+              const endDateMonth = utcEndDate.getUTCMonth()
+              const endDateDay = utcEndDate.getUTCDate()
+              const endDateHours = utcEndDate.getUTCHours()
+              const endDateMinutes = utcEndDate.getUTCMinutes()
+              const endDateSeconds = utcEndDate.getUTCSeconds()
+              const endDateMilliseconds = utcEndDate.getUTCMilliseconds()
+              // UTC 시간을 로컬 시간으로 해석하여 Date 객체 생성
+              dbEndDate = new Date(endDateYear, endDateMonth, endDateDay, endDateHours, endDateMinutes, endDateSeconds, endDateMilliseconds)
+            } else {
+              dbEndDate = end
+            }
+            
+            // 로컬 시간 기준으로 날짜 추출 (이미 로컬 시간으로 변환된 상태)
+            // 예: UTC "2025-12-31T18:00:00.000Z" → 로컬 "2025-12-31 18:00:00"
+            const endYear = dbEndDate.getFullYear()
+            const endMonth = dbEndDate.getMonth()
+            const endDay = dbEndDate.getDate()
+            const endHours = dbEndDate.getHours()
+            const endMinutes = dbEndDate.getMinutes()
+            const endSeconds = dbEndDate.getSeconds()
+            
+            // react-big-calendar는 end를 exclusive로 처리하므로
+            // 일 뷰에서는 실제 end 시간에 1분을 더하여 정확한 위치에 표시 (예: 18:00 → 18:01로 설정하여 18:00까지 표시)
+            // 월 뷰에서는 종료일 다음 날 00:00:00으로 설정 (종료일까지만 표시)
+            // end 시간이 있으면 실제 end 시간 + 1분, 없으면 종료일 다음 날 00:00:00
+            const displayEnd = (endHours !== 0 || endMinutes !== 0 || endSeconds !== 0)
+              ? new Date(endYear, endMonth, endDay, endHours, endMinutes + 1, 0) // 일 뷰: 실제 end 시간 + 1분 (18:00 → 18:01)
+              : new Date(endYear, endMonth, endDay + 1, 0, 0, 0, 0) // 월 뷰: 종료일 다음 날 00:00:00
+            
+            return {
+              ...event,
+              startDate: start, // 원본 startDate 저장
+              endDate: end, // 원본 endDate 저장
+              start: start, // 캘린더 표시용 start
+              end: displayEnd, // 캘린더 표시용 end (일 뷰: 실제 end 시간, 월 뷰: 종료일 다음 날 00:00:00)
+              originalEndDate: originalEndDate, // 원본 종료일 (수정 모달용)
+            }
+          } catch (error) {
+            if (import.meta.env.DEV) {
+              console.error(`[이벤트 ${event?.id || index}] 날짜 파싱 오류:`, error)
+            }
+            return null
+          }
+        })
+        .filter(event => event !== null) // null인 이벤트 제거
+        
+      setEvents(formattedEvents)
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error('이벤트 로드 실패:', error)
+        console.error('에러 상세:', error.response?.data || error.message)
+      }
+      setEvents([])
+      // 인증 오류(401)만 로그인 페이지로 리다이렉트
+      // 403(권한 없음)은 권한 부족이지 인증 실패가 아니므로 리다이렉트하지 않음
+      if (error.response?.status === 401) {
+        alert('인증이 만료되었습니다. 다시 로그인해주세요.')
+        setTimeout(() => {
+          window.location.href = '/login'
+        }, 1000)
+      }
+    }
+  }, [user])
+
+  // 팀 목록 로드
+  const loadTeams = useCallback(async () => {
+    try {
+      const data = await teamsAPI.getTeams()
+      setTeams(data)
+      // selectedTeamId는 변경하지 않음 (권한 변경 등으로 인한 팀 ID 변경 방지)
+      // 모든 팀의 일정을 조회하므로 selectedTeamId가 없어도 문제없음
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error('팀 로드 실패:', error)
+      }
+    }
+  }, [])
+
   useEffect(() => {
     loadTeams()
   }, [loadTeams])
@@ -387,20 +549,6 @@ function CalendarPage() {
     }
   }, [view, filteredEvents])
 
-  // 팀 목록 로드
-  const loadTeams = useCallback(async () => {
-    try {
-      const data = await teamsAPI.getTeams()
-      setTeams(data)
-      // selectedTeamId는 변경하지 않음 (권한 변경 등으로 인한 팀 ID 변경 방지)
-      // 모든 팀의 일정을 조회하므로 selectedTeamId가 없어도 문제없음
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('팀 로드 실패:', error)
-      }
-    }
-  }, [])
-
   // 이벤트 저장 핸들러
   const handleSaveEvent = useCallback(async (eventData) => {
     try {
@@ -498,154 +646,6 @@ function CalendarPage() {
       }
     }
   }, [loadEvents])
-
-  // 이벤트 로드
-  const loadEvents = useCallback(async () => {
-    try {
-      // 모든 팀의 일정을 공유하여 표시하므로 teamId를 항상 null로 전송
-      // (특정 팀을 선택한 경우에도 모든 팀의 일정을 보여줌)
-      const data = await eventsAPI.getEvents(null, null, null)
-      // 날짜 형식 변환 (백엔드에서 Date 객체로 받음)
-      // react-big-calendar는 end 날짜를 exclusive로 처리하므로,
-      // 종료일까지 표시하려면 end를 종료일 다음 날 자정으로 설정해야 함
-      
-      const formattedEvents = (data || [])
-          .map((event, index) => {
-            // 백엔드에서 받은 원본 startDate, endDate 사용 (ISO 문자열로 받음)
-            let start = null
-            let end = null
-            
-            try {
-              // ISO 문자열을 Date 객체로 변환
-              // 백엔드에서 UTC ISO 문자열로 전송 (예: "2025-12-09T09:00:00.000Z")
-              // UTC 시간을 로컬 시간으로 해석하여 Date 객체 생성 (모달 시간과 일치시키기 위해)
-              if (event.start) {
-                const utcStartDate = new Date(event.start)
-                // UTC 시간 추출
-                const startYear = utcStartDate.getUTCFullYear()
-                const startMonth = utcStartDate.getUTCMonth()
-                const startDay = utcStartDate.getUTCDate()
-                const startHours = utcStartDate.getUTCHours()
-                const startMinutes = utcStartDate.getUTCMinutes()
-                const startSeconds = utcStartDate.getUTCSeconds()
-                const startMilliseconds = utcStartDate.getUTCMilliseconds()
-                // UTC 시간을 로컬 시간으로 해석하여 Date 객체 생성
-                start = new Date(startYear, startMonth, startDay, startHours, startMinutes, startSeconds, startMilliseconds)
-              } else {
-                start = null
-              }
-              
-              if (event.end) {
-                const utcEndDate = new Date(event.end)
-                // UTC 시간 추출
-                const endYear = utcEndDate.getUTCFullYear()
-                const endMonth = utcEndDate.getUTCMonth()
-                const endDay = utcEndDate.getUTCDate()
-                const endHours = utcEndDate.getUTCHours()
-                const endMinutes = utcEndDate.getUTCMinutes()
-                const endSeconds = utcEndDate.getUTCSeconds()
-                const endMilliseconds = utcEndDate.getUTCMilliseconds()
-                // UTC 시간을 로컬 시간으로 해석하여 Date 객체 생성
-                end = new Date(endYear, endMonth, endDay, endHours, endMinutes, endSeconds, endMilliseconds)
-              } else {
-                end = null
-              }
-              
-              // 유효한 날짜인지 확인
-              if (start && isNaN(start.getTime())) {
-                if (import.meta.env.DEV) {
-                  console.warn(`[이벤트 ${event.id}] 유효하지 않은 start 날짜:`, event.start)
-                }
-                return null
-              }
-              if (end && isNaN(end.getTime())) {
-                if (import.meta.env.DEV) {
-                  console.warn(`[이벤트 ${event.id}] 유효하지 않은 end 날짜:`, event.end)
-                }
-                return null
-              }
-              
-              // start나 end가 없으면 제외
-              if (!start || !end) {
-                if (import.meta.env.DEV) {
-                  console.warn(`[이벤트 ${event.id}] 날짜 정보가 없음`)
-                }
-                return null
-              }
-              
-              // 원본 endDate 저장 (수정 모달에서 사용하기 위해)
-              const originalEndDate = new Date(end)
-              
-              // DB에서 받은 원본 endDate 사용 (백엔드에서 DB 원본 값 전송)
-              // endDate는 ISO 문자열로 오므로 UTC 시간을 로컬 시간으로 해석
-              let dbEndDate = null
-              if (event.endDate) {
-                const utcEndDate = new Date(event.endDate)
-                // UTC 시간 추출
-                const endDateYear = utcEndDate.getUTCFullYear()
-                const endDateMonth = utcEndDate.getUTCMonth()
-                const endDateDay = utcEndDate.getUTCDate()
-                const endDateHours = utcEndDate.getUTCHours()
-                const endDateMinutes = utcEndDate.getUTCMinutes()
-                const endDateSeconds = utcEndDate.getUTCSeconds()
-                const endDateMilliseconds = utcEndDate.getUTCMilliseconds()
-                // UTC 시간을 로컬 시간으로 해석하여 Date 객체 생성
-                dbEndDate = new Date(endDateYear, endDateMonth, endDateDay, endDateHours, endDateMinutes, endDateSeconds, endDateMilliseconds)
-              } else {
-                dbEndDate = end
-              }
-              
-              // 로컬 시간 기준으로 날짜 추출 (이미 로컬 시간으로 변환된 상태)
-              // 예: UTC "2025-12-31T18:00:00.000Z" → 로컬 "2025-12-31 18:00:00"
-              const endYear = dbEndDate.getFullYear()
-              const endMonth = dbEndDate.getMonth()
-              const endDay = dbEndDate.getDate()
-              const endHours = dbEndDate.getHours()
-              const endMinutes = dbEndDate.getMinutes()
-              const endSeconds = dbEndDate.getSeconds()
-              
-              // react-big-calendar는 end를 exclusive로 처리하므로
-              // 일 뷰에서는 실제 end 시간에 1분을 더하여 정확한 위치에 표시 (예: 18:00 → 18:01로 설정하여 18:00까지 표시)
-              // 월 뷰에서는 종료일 다음 날 00:00:00으로 설정 (종료일까지만 표시)
-              // end 시간이 있으면 실제 end 시간 + 1분, 없으면 종료일 다음 날 00:00:00
-              const displayEnd = (endHours !== 0 || endMinutes !== 0 || endSeconds !== 0)
-                ? new Date(endYear, endMonth, endDay, endHours, endMinutes + 1, 0) // 일 뷰: 실제 end 시간 + 1분 (18:00 → 18:01)
-                : new Date(endYear, endMonth, endDay + 1, 0, 0, 0, 0) // 월 뷰: 종료일 다음 날 00:00:00
-              
-              return {
-                ...event,
-                startDate: start, // 원본 startDate 저장
-                endDate: end, // 원본 endDate 저장
-                start: start, // 캘린더 표시용 start
-                end: displayEnd, // 캘린더 표시용 end (일 뷰: 실제 end 시간, 월 뷰: 종료일 다음 날 00:00:00)
-                originalEndDate: originalEndDate, // 원본 종료일 (수정 모달용)
-              }
-            } catch (error) {
-              if (import.meta.env.DEV) {
-                console.error(`[이벤트 ${event?.id || index}] 날짜 파싱 오류:`, error)
-              }
-              return null
-            }
-          })
-          .filter(event => event !== null) // null인 이벤트 제거
-          
-      setEvents(formattedEvents)
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('이벤트 로드 실패:', error)
-        console.error('에러 상세:', error.response?.data || error.message)
-      }
-      setEvents([])
-      // 인증 오류(401)만 로그인 페이지로 리다이렉트
-      // 403(권한 없음)은 권한 부족이지 인증 실패가 아니므로 리다이렉트하지 않음
-      if (error.response?.status === 401) {
-        alert('인증이 만료되었습니다. 다시 로그인해주세요.')
-        setTimeout(() => {
-          window.location.href = '/login'
-        }, 1000)
-      }
-    }
-  }, [user])
 
   // 이벤트 스타일 - 가시성 개선
   const eventStyleGetter = (event) => {
