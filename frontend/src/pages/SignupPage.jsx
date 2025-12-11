@@ -94,8 +94,20 @@ function SignupPage() {
         exists = users.some((u) => u.employeeNumber === employeeNumber.toUpperCase())
       } else {
         // 실제 API 호출
-        const response = await authAPI.checkEmployeeNumber(employeeNumber)
-        exists = response.exists
+        try {
+          const response = await authAPI.checkEmployeeNumber(employeeNumber)
+          // 응답이 존재하는지 확인
+          if (response && typeof response.exists === 'boolean') {
+            exists = response.exists
+          } else {
+            console.error('예상하지 못한 API 응답 형식:', response)
+            throw new Error('서버 응답 형식이 올바르지 않습니다.')
+          }
+        } catch (apiError) {
+          // API 호출 자체가 실패한 경우 (네트워크 오류 등)
+          console.error('API 호출 실패:', apiError)
+          throw apiError
+        }
       }
       
       const isAvailable = !exists
@@ -110,12 +122,18 @@ function SignupPage() {
       return { success: true, exists, available: isAvailable }
     } catch (error) {
       console.error('직원번호 확인 실패:', error)
+      
+      // 백엔드에서 반환한 구체적인 에러 메시지 사용
+      const errorMessage = error.response?.data?.message 
+        || error.message 
+        || '직원번호 확인 중 오류가 발생했습니다. 다시 시도해주세요.'
+      
       setErrors(prev => ({ 
         ...prev, 
-        employeeNumber: '직원번호 확인 중 오류가 발생했습니다. 다시 시도해주세요.' 
+        employeeNumber: errorMessage
       }))
       setEmployeeNumberChecked(false)
-      return { success: false, exists: null, available: false, error: error.message }
+      return { success: false, exists: null, available: false, error: errorMessage }
     } finally {
       setCheckingEmployeeNumber(false)
     }
