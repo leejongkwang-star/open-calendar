@@ -225,9 +225,42 @@ function CalendarPage() {
   // 이벤트 로드 (먼저 정의하여 다른 함수들이 참조할 수 있도록)
   const loadEvents = useCallback(async () => {
     try {
+      // 현재 뷰와 선택된 날짜를 기반으로 조회할 날짜 범위 계산
+      let startDate = null
+      let endDate = null
+      
+      if (view === 'month') {
+        // 월 뷰: 해당 월의 첫날 ~ 마지막날
+        const monthStart = moment(selectedDate).startOf('month').toDate()
+        const monthEnd = moment(selectedDate).endOf('month').toDate()
+        startDate = monthStart
+        endDate = monthEnd
+      } else if (view === 'week') {
+        // 주 뷰: 해당 주의 첫날(일요일) ~ 마지막날(토요일)
+        const weekStart = moment(selectedDate).startOf('week').toDate()
+        const weekEnd = moment(selectedDate).endOf('week').toDate()
+        startDate = weekStart
+        endDate = weekEnd
+      } else if (view === 'day') {
+        // 일 뷰: 해당 날짜
+        const dayStart = moment(selectedDate).startOf('day').toDate()
+        const dayEnd = moment(selectedDate).endOf('day').toDate()
+        startDate = dayStart
+        endDate = dayEnd
+      } else {
+        // agenda 뷰 등: 현재 월 기준으로 조회 (넓은 범위)
+        const monthStart = moment(selectedDate).startOf('month').toDate()
+        const monthEnd = moment(selectedDate).endOf('month').toDate()
+        startDate = monthStart
+        endDate = monthEnd
+      }
+      
       // 모든 팀의 일정을 공유하여 표시하므로 teamId를 항상 null로 전송
       // (특정 팀을 선택한 경우에도 모든 팀의 일정을 보여줌)
-      const data = await eventsAPI.getEvents(null, null, null)
+      // 날짜 범위를 ISO 문자열로 변환하여 전송
+      const startDateStr = startDate ? moment(startDate).toISOString() : null
+      const endDateStr = endDate ? moment(endDate).toISOString() : null
+      const data = await eventsAPI.getEvents(null, startDateStr, endDateStr)
       // 날짜 형식 변환 (백엔드에서 Date 객체로 받음)
       // react-big-calendar는 end 날짜를 exclusive로 처리하므로,
       // 종료일까지 표시하려면 end를 종료일 다음 날 자정으로 설정해야 함
@@ -368,7 +401,7 @@ function CalendarPage() {
         }, 1000)
       }
     }
-  }, [user])
+  }, [user, view, selectedDate])
 
   // 팀 목록 로드
   const loadTeams = useCallback(async () => {
@@ -395,6 +428,13 @@ function CalendarPage() {
       loadEvents()
     }
   }, [teams, loadEvents]) // loadEvents 의존성 추가
+
+  // 뷰나 날짜가 변경되면 해당 기간의 일정만 다시 조회
+  useEffect(() => {
+    if (teams.length > 0) {
+      loadEvents()
+    }
+  }, [view, selectedDate, loadEvents, teams])
 
   // 일/주 뷰에서 겹치는 이벤트를 세로로 재배치
   useEffect(() => {
