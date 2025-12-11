@@ -265,11 +265,11 @@ function CalendarPage() {
       // react-big-calendar는 end 날짜를 exclusive로 처리하므로,
       // 종료일까지 표시하려면 end를 종료일 다음 날 자정으로 설정해야 함
       
-      // 성능 최적화: 백엔드에서 이미 변환된 start/end를 사용하되, 필요시에만 추가 변환
+      // 성능 최적화: 백엔드에서 받은 UTC ISO 문자열을 UTC 기준으로 처리
       const formattedEvents = (data || [])
         .map((event) => {
           try {
-            // 백엔드에서 이미 변환된 start와 end 사용
+            // 백엔드에서 받은 UTC ISO 문자열을 Date 객체로 변환
             const start = event.start ? new Date(event.start) : null
             const end = event.end ? new Date(event.end) : null
             
@@ -284,29 +284,36 @@ function CalendarPage() {
             // 원본 endDate 저장 (수정 모달에서 사용)
             const originalEndDate = event.endDate ? new Date(event.endDate) : new Date(end)
             
-            // react-big-calendar는 end를 exclusive로 처리하므로
-            // startDate와 endDate가 같은 날이면 (하루짜리 일정) 시작일 다음 날 00:00:00으로 설정
-            // 다른 날이면 (여러 날짜 일정) 종료일 다음 날 00:00:00으로 설정
-            const startDate = start.getFullYear() * 10000 + (start.getMonth() + 1) * 100 + start.getDate()
-            const endDate = end.getFullYear() * 10000 + (end.getMonth() + 1) * 100 + end.getDate()
-            const isSameDay = startDate === endDate
+            // UTC 기준으로 날짜 비교 (하루짜리 일정 확인)
+            const startUTCDate = start.getUTCFullYear() * 10000 + (start.getUTCMonth() + 1) * 100 + start.getUTCDate()
+            const endUTCDate = end.getUTCFullYear() * 10000 + (end.getUTCMonth() + 1) * 100 + end.getUTCDate()
+            const isSameDay = startUTCDate === endUTCDate
             
+            // react-big-calendar는 Date 객체를 로컬 시간으로 해석하므로
+            // UTC 시간을 로컬 시간으로 변환하여 표시해야 함
+            const startLocal = new Date(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate(),
+                                       start.getUTCHours(), start.getUTCMinutes(), start.getUTCSeconds())
+            const endLocal = new Date(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate(),
+                                     end.getUTCHours(), end.getUTCMinutes(), end.getUTCSeconds())
+            
+            // react-big-calendar는 end를 exclusive로 처리하므로
+            // 하루짜리 일정: 시작일 다음 날 00:00:00 (로컬 시간)으로 설정
+            // 여러 날짜 일정: 종료일 다음 날 00:00:00 (로컬 시간)으로 설정
             let displayEnd
             if (isSameDay) {
-              // 하루짜리 일정: 시작일 다음 날 00:00:00으로 설정하여 하루만 표시
-              // react-big-calendar는 end를 exclusive로 처리하므로 다음 날 00:00:00이면 해당 날까지만 표시됨
-              displayEnd = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1, 0, 0, 0, 0)
+              // 하루짜리 일정: 시작일 다음 날 00:00:00으로 설정
+              displayEnd = new Date(startLocal.getFullYear(), startLocal.getMonth(), startLocal.getDate() + 1, 0, 0, 0, 0)
             } else {
               // 여러 날짜 일정: 종료일 다음 날 00:00:00으로 설정
-              displayEnd = new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1, 0, 0, 0, 0)
+              displayEnd = new Date(endLocal.getFullYear(), endLocal.getMonth(), endLocal.getDate() + 1, 0, 0, 0, 0)
             }
             
             return {
               ...event,
-              startDate: start, // 원본 startDate 저장
-              endDate: end, // 원본 endDate 저장
-              start: start, // 캘린더 표시용 start
-              end: displayEnd, // 캘린더 표시용 end
+              startDate: startLocal, // 원본 startDate 저장 (로컬 시간)
+              endDate: endLocal, // 원본 endDate 저장 (로컬 시간)
+              start: startLocal, // 캘린더 표시용 start (로컬 시간)
+              end: displayEnd, // 캘린더 표시용 end (로컬 시간)
               originalEndDate: originalEndDate, // 원본 종료일 (수정 모달용)
             }
           } catch (error) {

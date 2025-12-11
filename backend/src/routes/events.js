@@ -130,11 +130,11 @@ router.get(
 
       // Date 객체를 ISO 문자열로 변환하여 JSON 직렬화 문제 방지
       const serializedEvents = validEvents.map(event => ({
-        ...event,
-        start: event.start.toISOString(),
-        end: event.end.toISOString(),
-        startDate: event.startDate.toISOString(),
-        endDate: event.endDate.toISOString(),
+          ...event,
+          start: event.start.toISOString(),
+          end: event.end.toISOString(),
+          startDate: event.startDate.toISOString(),
+          endDate: event.endDate.toISOString(),
       }))
 
       res.json(serializedEvents)
