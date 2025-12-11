@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { Plus, Edit, Trash2, Users, Shield, Search, X, CheckCircle, XCircle, Clock, UserCog } from 'lucide-react'
 import { teamsAPI } from '../api/teams'
 import { authAPI } from '../api/auth'
-import { getMockTeams, getMockMembers, getPendingUsers, approveUser, rejectUser } from '../utils/mockData'
 import { useAuthStore } from '../store/authStore'
 import TeamModal from '../components/TeamModal'
 import MemberModal from '../components/MemberModal'
@@ -48,15 +47,8 @@ function AdminPage() {
 
   const loadPendingUsers = async () => {
     try {
-      const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
-      
-      if (USE_MOCK) {
-        const pending = getPendingUsers()
-        setPendingUsers(pending)
-      } else {
-        const data = await authAPI.getPendingUsers()
-        setPendingUsers(data || [])
-      }
+      const data = await authAPI.getPendingUsers()
+      setPendingUsers(data || [])
     } catch (error) {
       console.error('승인 대기 사용자 로드 실패:', error)
       console.error('에러 상세:', error.response?.data || error.message)
@@ -71,16 +63,9 @@ function AdminPage() {
 
   const loadTeams = async () => {
     try {
-      const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
-      
-      if (USE_MOCK) {
-        const mockTeams = getMockTeams()
-        setTeams(mockTeams)
-      } else {
-        const data = await teamsAPI.getTeams()
-        console.log('팀 목록 로드 성공:', data)
-        setTeams(data || [])
-      }
+      const data = await teamsAPI.getTeams()
+      console.log('팀 목록 로드 성공:', data)
+      setTeams(data || [])
     } catch (error) {
       console.error('팀 로드 실패:', error)
       console.error('에러 상세:', error.response?.data || error.message)
@@ -100,16 +85,9 @@ function AdminPage() {
 
   const loadMembers = async (teamId) => {
     try {
-      const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
-      
-      if (USE_MOCK) {
-        const mockMembers = getMockMembers()
-        setMembers(mockMembers)
-      } else {
-        const data = await teamsAPI.getTeamMembers(teamId)
-        console.log('구성원 목록 로드 성공:', data)
-        setMembers(data || [])
-      }
+      const data = await teamsAPI.getTeamMembers(teamId)
+      console.log('구성원 목록 로드 성공:', data)
+      setMembers(data || [])
     } catch (error) {
       console.error('구성원 로드 실패:', error)
       console.error('에러 상세:', error.response?.data || error.message)
@@ -133,13 +111,7 @@ function AdminPage() {
     }
 
     try {
-      const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
-      
-      if (USE_MOCK) {
-        approveUser(userId, user?.id)
-      } else {
-        await authAPI.approveUser(userId)
-      }
+      await authAPI.approveUser(userId)
       
       loadPendingUsers()
       alert('회원가입이 승인되었습니다.')
@@ -158,13 +130,7 @@ function AdminPage() {
     if (!selectedPendingUser) return
 
     try {
-      const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
-      
-      if (USE_MOCK) {
-        rejectUser(selectedPendingUser, rejectionReason, user?.id)
-      } else {
-        await authAPI.rejectUser(selectedPendingUser, rejectionReason)
-      }
+      await authAPI.rejectUser(selectedPendingUser, rejectionReason)
       
       loadPendingUsers()
       setShowRejectModal(false)
@@ -250,23 +216,16 @@ function AdminPage() {
 
   const loadAllUsers = async () => {
     try {
-      const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
+      const params = {}
+      // 백엔드는 대문자('PENDING', 'APPROVED', 'REJECTED')를 기대하므로 변환
+      if (userStatusFilter !== 'all') params.status = userStatusFilter.toUpperCase()
+      // 백엔드는 대문자('ADMIN', 'MEMBER')를 기대하므로 변환
+      if (userRoleFilter !== 'all') params.role = userRoleFilter.toUpperCase()
+      if (userSearchTerm) params.search = userSearchTerm
       
-      if (USE_MOCK) {
-        // Mock 데이터는 전체 사용자 목록이 없으므로 빈 배열 반환
-        setAllUsers([])
-      } else {
-        const params = {}
-        // 백엔드는 대문자('PENDING', 'APPROVED', 'REJECTED')를 기대하므로 변환
-        if (userStatusFilter !== 'all') params.status = userStatusFilter.toUpperCase()
-        // 백엔드는 대문자('ADMIN', 'MEMBER')를 기대하므로 변환
-        if (userRoleFilter !== 'all') params.role = userRoleFilter.toUpperCase()
-        if (userSearchTerm) params.search = userSearchTerm
-        
-        const data = await authAPI.getAllUsers(params)
-        console.log('회원 목록 로드 성공:', data)
-        setAllUsers(data || [])
-      }
+      const data = await authAPI.getAllUsers(params)
+      console.log('회원 목록 로드 성공:', data)
+      setAllUsers(data || [])
     } catch (error) {
       console.error('회원 목록 로드 실패:', error)
       console.error('에러 상세:', error.response?.data || error.message)
@@ -286,15 +245,11 @@ function AdminPage() {
 
   const handleUpdateUser = async (userId, userData) => {
     try {
-      const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
-      
-      if (!USE_MOCK) {
-        await authAPI.updateUser(userId, userData)
-        loadAllUsers()
-        setShowUserEditModal(false)
-        setSelectedUser(null)
-        alert('회원 정보가 수정되었습니다.')
-      }
+      await authAPI.updateUser(userId, userData)
+      loadAllUsers()
+      setShowUserEditModal(false)
+      setSelectedUser(null)
+      alert('회원 정보가 수정되었습니다.')
     } catch (error) {
       console.error('회원 정보 수정 실패:', error)
       alert(error.response?.data?.message || '회원 정보 수정에 실패했습니다.')
@@ -307,13 +262,9 @@ function AdminPage() {
     }
 
     try {
-      const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
-      
-      if (!USE_MOCK) {
-        await authAPI.deleteUser(userId)
-        loadAllUsers()
-        alert('회원이 삭제되었습니다.')
-      }
+      await authAPI.deleteUser(userId)
+      loadAllUsers()
+      alert('회원이 삭제되었습니다.')
     } catch (error) {
       console.error('회원 삭제 실패:', error)
       alert(error.response?.data?.message || '회원 삭제에 실패했습니다.')

@@ -1,5 +1,4 @@
 import { X } from 'lucide-react'
-import { getMockMembers } from '../utils/mockData'
 import { EVENT_TYPE_OPTIONS, toKoreanEventType } from '../utils/eventTypeMapping'
 
 function FilterPanel({ filters, onFiltersChange, onClose }) {
@@ -24,9 +23,8 @@ function FilterPanel({ filters, onFiltersChange, onClose }) {
     })
   }
 
-  // 모크 데이터에서 구성원 목록 가져오기
-  const mockMembers = getMockMembers()
-  const members = mockMembers.map((m) => ({ id: m.id, name: m.name }))
+  // 구성원 필터는 현재 비활성화 (실제 API 연동 필요)
+  const members = []
 
   // 이벤트 타입은 EVENT_TYPE_OPTIONS에서 가져오기
   const eventTypes = EVENT_TYPE_OPTIONS.map(opt => opt.value)

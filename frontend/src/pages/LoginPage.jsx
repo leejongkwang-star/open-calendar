@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { authAPI } from '../api/auth'
-import { mockLogin, loadMockData } from '../utils/mockData'
 import { Hash, Lock, AlertCircle } from 'lucide-react'
 import ForgotPasswordModal from '../components/ForgotPasswordModal'
 
@@ -17,10 +16,6 @@ function LoginPage() {
   const navigate = useNavigate()
   const { login } = useAuthStore()
 
-  useEffect(() => {
-    // 더미 데이터 초기화
-    loadMockData()
-  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -28,15 +23,7 @@ function LoginPage() {
     setLoading(true)
 
     try {
-      // 백엔드가 없을 경우 모크 로그인 사용
-      const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
-      
-      let response
-      if (USE_MOCK) {
-        response = await mockLogin(employeeNumber, password)
-      } else {
-        response = await authAPI.login(employeeNumber, password)
-      }
+      const response = await authAPI.login(employeeNumber, password)
       
       login(response.user, response.token)
       navigate('/calendar')

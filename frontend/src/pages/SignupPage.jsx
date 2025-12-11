@@ -3,7 +3,6 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { authAPI } from '../api/auth'
 import { teamsAPI } from '../api/teams'
-import { mockSignup, loadMockData } from '../utils/mockData'
 import { Hash, Lock, User, AlertCircle, CheckCircle, Loader2, Building2, Briefcase, Phone } from 'lucide-react'
 
 function SignupPage() {
@@ -27,7 +26,6 @@ function SignupPage() {
   const { login } = useAuthStore()
 
   useEffect(() => {
-    loadMockData()
     // 팀 목록 로드
     loadTeams()
   }, [])
@@ -35,15 +33,8 @@ function SignupPage() {
   const loadTeams = async () => {
     setLoadingTeams(true)
     try {
-      const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
-      if (USE_MOCK) {
-        // 모크 데이터 사용 (로컬 스토리지에서)
-        const mockTeams = JSON.parse(localStorage.getItem('mock-teams') || '[]')
-        setTeams(mockTeams)
-      } else {
-        const teamsData = await teamsAPI.getPublicTeams()
-        setTeams(teamsData)
-      }
+      const teamsData = await teamsAPI.getPublicTeams()
+      setTeams(teamsData)
     } catch (error) {
       console.error('팀 목록 로드 실패:', error)
       setErrors(prev => ({ ...prev, team: '팀 목록을 불러올 수 없습니다.' }))
@@ -115,18 +106,9 @@ function SignupPage() {
 
     setCheckingEmployeeNumber(true)
     try {
-      const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
-      
-      let exists = false
-      if (USE_MOCK) {
-        // 모크 모드: 로컬 스토리지에서 확인
-        const users = JSON.parse(localStorage.getItem('mock-users') || '[]')
-        exists = users.some((u) => u.employeeNumber === employeeNumber.toUpperCase())
-      } else {
-        // 실제 API 호출
-        const response = await authAPI.checkEmployeeNumber(employeeNumber)
-        exists = response.exists
-      }
+      // 실제 API 호출
+      const response = await authAPI.checkEmployeeNumber(employeeNumber)
+      const exists = response.exists
       
       const isAvailable = !exists
       setEmployeeNumberChecked(isAvailable)
@@ -230,14 +212,7 @@ function SignupPage() {
     setLoading(true)
 
     try {
-      const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
-      
-      let response
-      if (USE_MOCK) {
-        response = await mockSignup(formData.name, formData.employeeNumber, formData.password)
-      } else {
-        response = await authAPI.signup(formData)
-      }
+      const response = await authAPI.signup(formData)
       
       // 회원가입 성공 시 승인 대기 안내
       // 자동 로그인하지 않음

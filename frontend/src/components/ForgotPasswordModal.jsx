@@ -78,34 +78,16 @@ function ForgotPasswordModal({ isOpen, onClose, initialEmployeeNumber = '' }) {
         return
       }
 
-      const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
+      // 실제 API 호출 - 직원번호 확인
+      const response = await authAPI.checkEmployeeNumber(cleanEmployeeNumber)
       
-      if (USE_MOCK) {
-        // Mock 모드: 로컬 스토리지에서 확인
-        const users = JSON.parse(localStorage.getItem('mock-users') || '[]')
-        const user = users.find((u) => u.employeeNumber.toUpperCase() === cleanEmployeeNumber.toUpperCase())
-        
-        if (user) {
-          setUserInfo({
-            employeeNumber: user.employeeNumber,
-            name: user.name,
-          })
-          setStep(2) // 비밀번호 재설정 단계로 이동
-        } else {
-          setError('해당 직원번호로 등록된 사용자를 찾을 수 없습니다.')
-        }
+      if (response && response.exists) {
+        setUserInfo({
+          employeeNumber: cleanEmployeeNumber,
+        })
+        setStep(2) // 비밀번호 재설정 단계로 이동
       } else {
-        // 실제 API 호출 - 직원번호 확인
-        const response = await authAPI.checkEmployeeNumber(cleanEmployeeNumber)
-        
-        if (response && response.exists) {
-          setUserInfo({
-            employeeNumber: cleanEmployeeNumber,
-          })
-          setStep(2) // 비밀번호 재설정 단계로 이동
-        } else {
-          setError('해당 직원번호로 등록된 사용자를 찾을 수 없습니다.')
-        }
+        setError('해당 직원번호로 등록된 사용자를 찾을 수 없습니다.')
       }
     } catch (err) {
       console.error('직원번호 확인 실패:', err)
@@ -143,29 +125,12 @@ function ForgotPasswordModal({ isOpen, onClose, initialEmployeeNumber = '' }) {
     setLoading(true)
 
     try {
-      const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
-      
-      if (USE_MOCK) {
-        // Mock 모드: 로컬 스토리지 업데이트
-        const users = JSON.parse(localStorage.getItem('mock-users') || '[]')
-        const updatedUsers = users.map((u) =>
-          u.employeeNumber.toUpperCase() === employeeNumber.toUpperCase()
-            ? { ...u, password: newPassword }
-            : u
-        )
-        localStorage.setItem('mock-users', JSON.stringify(updatedUsers))
-        setSuccess(true)
-        setTimeout(() => {
-          handleClose()
-        }, 2000)
-      } else {
-        // 실제 API 호출 - 비밀번호 재설정
-        await authAPI.resetPassword(employeeNumber, newPassword)
-        setSuccess(true)
-        setTimeout(() => {
-          handleClose()
-        }, 2000)
-      }
+      // 실제 API 호출 - 비밀번호 재설정
+      await authAPI.resetPassword(employeeNumber, newPassword)
+      setSuccess(true)
+      setTimeout(() => {
+        handleClose()
+      }, 2000)
     } catch (err) {
       console.error('비밀번호 재설정 실패:', err)
       setError(err.response?.data?.message || '비밀번호 재설정 중 오류가 발생했습니다.')

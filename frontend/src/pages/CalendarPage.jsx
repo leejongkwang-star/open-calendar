@@ -7,7 +7,6 @@ import { Plus, Filter } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { eventsAPI } from '../api/events'
 import { teamsAPI } from '../api/teams'
-import { getMockEvents, saveMockEvent, deleteMockEvent, loadMockData } from '../utils/mockData'
 import EventModal from '../components/EventModal'
 import EventPopup from '../components/EventPopup'
 import FilterPanel from '../components/FilterPanel'
@@ -224,17 +223,16 @@ function CalendarPage() {
   }
 
   useEffect(() => {
-    loadMockData()
     loadTeams()
-  }, [])
+  }, [loadTeams])
 
   useEffect(() => {
     // 팀 목록이 로드되면 이벤트 조회
     // 모든 팀의 일정을 항상 조회하므로 selectedTeamId와 무관하게 로드
-    if (teams.length > 0 || !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true') {
+    if (teams.length > 0) {
       loadEvents()
     }
-  }, [teams]) // selectedTeamId 의존성 제거 (모든 팀의 일정을 항상 조회하므로)
+  }, [teams, loadEvents]) // loadEvents 의존성 추가
 
   // 일/주 뷰에서 겹치는 이벤트를 세로로 재배치
   useEffect(() => {
@@ -392,21 +390,10 @@ function CalendarPage() {
   // 팀 목록 로드
   const loadTeams = useCallback(async () => {
     try {
-      const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
-      
-      if (USE_MOCK) {
-        // 모크 모드: 로컬 스토리지 사용
-        const mockTeams = JSON.parse(localStorage.getItem('mockTeams') || '[]')
-        setTeams(mockTeams)
-        // selectedTeamId는 변경하지 않음 (권한 변경 등으로 인한 팀 ID 변경 방지)
-        // 모든 팀의 일정을 조회하므로 selectedTeamId가 없어도 문제없음
-      } else {
-        // 실제 API 호출
-        const data = await teamsAPI.getTeams()
-        setTeams(data)
-        // selectedTeamId는 변경하지 않음 (권한 변경 등으로 인한 팀 ID 변경 방지)
-        // 모든 팀의 일정을 조회하므로 selectedTeamId가 없어도 문제없음
-      }
+      const data = await teamsAPI.getTeams()
+      setTeams(data)
+      // selectedTeamId는 변경하지 않음 (권한 변경 등으로 인한 팀 ID 변경 방지)
+      // 모든 팀의 일정을 조회하므로 selectedTeamId가 없어도 문제없음
     } catch (error) {
       if (import.meta.env.DEV) {
         console.error('팀 로드 실패:', error)
@@ -417,76 +404,52 @@ function CalendarPage() {
   // 이벤트 저장 핸들러
   const handleSaveEvent = useCallback(async (eventData) => {
     try {
-      const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
-      
       // teamId 설정 (이벤트 데이터에서 teamId 우선 사용, 없으면 현재 선택된 팀 사용)
       const teamId = eventData.teamId || selectedEvent?.teamId || selectedTeamId
       
-      if (!teamId && !USE_MOCK) {
+      if (!teamId) {
         alert('팀을 선택해주세요.')
         return
       }
       
-      if (USE_MOCK) {
-        // 모크 모드: 로컬 스토리지 사용
-        let finalTitle = eventData.title
-        if (!selectedEvent?.id && user?.name) {
-          // 신규 등록 시: 제목에 사용자 이름 추가 (처음만)
-          finalTitle = `${eventData.title} (${user.name})`
-        } else if (selectedEvent?.id) {
-          // 수정 시: 제목에서 사용자 이름 부분 제거
-          finalTitle = eventData.title.replace(/\s*\([^)]+\)\s*$/, '').trim()
-        }
-        
-        const event = {
-          ...eventData,
-          title: finalTitle,
-          teamId: teamId || 1,
-          start: new Date(eventData.startDate + (eventData.startTime ? 'T' + eventData.startTime : '')),
-          end: new Date(eventData.endDate + (eventData.endTime ? 'T' + eventData.endTime : '')),
-        }
-        saveMockEvent(event)
+      // 날짜와 시간 처리 로직
+      const startDate = eventData.startDate
+      const endDate = eventData.endDate
+      let startTime = eventData.startTime
+      let endTime = eventData.endTime
+      
+      // 시작일과 종료일이 다른 경우 (여러 날짜 일정)
+      if (startDate !== endDate) {
+        // 여러 날짜 일정: 시작일 09시, 종료일 18시
+        startTime = '09:00'
+        endTime = '18:00'
+      }
+      // 시작일과 종료일이 같은 경우 (하루 일정)
+      // 이미 설정된 시간을 그대로 사용 (종일 버튼 클릭 시 09:00-18:00, 그 외에는 등록 시간 +1시간)
+      
+      // startDate와 endDate에 시간을 포함하여 전송
+      // 형식: "YYYY-MM-DDTHH:mm" 또는 "YYYY-MM-DD HH:mm"
+      const startDateTime = `${startDate}T${startTime || '00:00'}`
+      const endDateTime = `${endDate}T${endTime || '00:00'}`
+      
+      const finalEventData = {
+        ...eventData,
+        startDate: startDateTime,
+        endDate: endDateTime,
+        startTime: null, // startTime은 null로 전송 (startDate에 시간 포함)
+        endTime: null, // endTime은 null로 전송 (endDate에 시간 포함)
+      }
+      
+      if (selectedEvent?.id) {
+        // 수정 시: 제목에서 사용자 이름 부분 제거
+        const cleanTitle = eventData.title.replace(/\s*\([^)]+\)\s*$/, '').trim()
+        await eventsAPI.updateEvent(selectedEvent.id, { ...finalEventData, title: cleanTitle })
       } else {
-        // 실제 API 호출
-        // 날짜와 시간 처리 로직
-        const startDate = eventData.startDate
-        const endDate = eventData.endDate
-        let startTime = eventData.startTime
-        let endTime = eventData.endTime
-        
-        // 시작일과 종료일이 다른 경우 (여러 날짜 일정)
-        if (startDate !== endDate) {
-          // 여러 날짜 일정: 시작일 09시, 종료일 18시
-          startTime = '09:00'
-          endTime = '18:00'
-        }
-        // 시작일과 종료일이 같은 경우 (하루 일정)
-        // 이미 설정된 시간을 그대로 사용 (종일 버튼 클릭 시 09:00-18:00, 그 외에는 등록 시간 +1시간)
-        
-        // startDate와 endDate에 시간을 포함하여 전송
-        // 형식: "YYYY-MM-DDTHH:mm" 또는 "YYYY-MM-DD HH:mm"
-        const startDateTime = `${startDate}T${startTime || '00:00'}`
-        const endDateTime = `${endDate}T${endTime || '00:00'}`
-        
-        const finalEventData = {
-          ...eventData,
-          startDate: startDateTime,
-          endDate: endDateTime,
-          startTime: null, // startTime은 null로 전송 (startDate에 시간 포함)
-          endTime: null, // endTime은 null로 전송 (endDate에 시간 포함)
-        }
-        
-        if (selectedEvent?.id) {
-          // 수정 시: 제목에서 사용자 이름 부분 제거
-          const cleanTitle = eventData.title.replace(/\s*\([^)]+\)\s*$/, '').trim()
-          await eventsAPI.updateEvent(selectedEvent.id, { ...finalEventData, title: cleanTitle })
-        } else {
-          // 신규 등록 시: 제목에 사용자 이름 추가 (처음만)
-          const titleWithName = user?.name 
-            ? `${eventData.title} (${user.name})` 
-            : eventData.title
-          await eventsAPI.createEvent({ ...finalEventData, title: titleWithName, teamId })
-        }
+        // 신규 등록 시: 제목에 사용자 이름 추가 (처음만)
+        const titleWithName = user?.name 
+          ? `${eventData.title} (${user.name})` 
+          : eventData.title
+        await eventsAPI.createEvent({ ...finalEventData, title: titleWithName, teamId })
       }
       
       // 이벤트 목록 새로고침
@@ -515,13 +478,7 @@ function CalendarPage() {
     if (!window.confirm('이 일정을 삭제하시겠습니까?')) return
 
     try {
-      const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
-      
-      if (USE_MOCK) {
-        deleteMockEvent(eventId)
-      } else {
-        await eventsAPI.deleteEvent(eventId)
-      }
+      await eventsAPI.deleteEvent(eventId)
       
       loadEvents()
       setShowEventModal(false)
@@ -545,22 +502,14 @@ function CalendarPage() {
   // 이벤트 로드
   const loadEvents = useCallback(async () => {
     try {
-      const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
+      // 모든 팀의 일정을 공유하여 표시하므로 teamId를 항상 null로 전송
+      // (특정 팀을 선택한 경우에도 모든 팀의 일정을 보여줌)
+      const data = await eventsAPI.getEvents(null, null, null)
+      // 날짜 형식 변환 (백엔드에서 Date 객체로 받음)
+      // react-big-calendar는 end 날짜를 exclusive로 처리하므로,
+      // 종료일까지 표시하려면 end를 종료일 다음 날 자정으로 설정해야 함
       
-      if (USE_MOCK) {
-        // 모크 모드: 로컬 스토리지에서 로드
-        const mockEvents = getMockEvents()
-        setEvents(mockEvents)
-      } else {
-        // 실제 API 호출
-        // 모든 팀의 일정을 공유하여 표시하므로 teamId를 항상 null로 전송
-        // (특정 팀을 선택한 경우에도 모든 팀의 일정을 보여줌)
-        const data = await eventsAPI.getEvents(null, null, null)
-        // 날짜 형식 변환 (백엔드에서 Date 객체로 받음)
-        // react-big-calendar는 end 날짜를 exclusive로 처리하므로,
-        // 종료일까지 표시하려면 end를 종료일 다음 날 자정으로 설정해야 함
-        
-        const formattedEvents = (data || [])
+      const formattedEvents = (data || [])
           .map((event, index) => {
             // 백엔드에서 받은 원본 startDate, endDate 사용 (ISO 문자열로 받음)
             let start = null
@@ -680,8 +629,7 @@ function CalendarPage() {
           })
           .filter(event => event !== null) // null인 이벤트 제거
           
-        setEvents(formattedEvents)
-      }
+      setEvents(formattedEvents)
     } catch (error) {
       if (import.meta.env.DEV) {
         console.error('이벤트 로드 실패:', error)
@@ -697,7 +645,7 @@ function CalendarPage() {
         }, 1000)
       }
     }
-  }
+  }, [user])
 
   // 이벤트 스타일 - 가시성 개선
   const eventStyleGetter = (event) => {
