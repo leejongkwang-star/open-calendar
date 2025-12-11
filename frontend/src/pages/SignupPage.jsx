@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { authAPI } from '../api/auth'
 import { mockSignup, loadMockData } from '../utils/mockData'
-import { Hash, Lock, User, AlertCircle, CheckCircle } from 'lucide-react'
+import { Hash, Lock, User, AlertCircle, CheckCircle, Loader2 } from 'lucide-react'
 
 function SignupPage() {
   const [formData, setFormData] = useState({
@@ -15,6 +15,8 @@ function SignupPage() {
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
   const [employeeNumberChecked, setEmployeeNumberChecked] = useState(false)
+  const [checkingEmployeeNumber, setCheckingEmployeeNumber] = useState(false)
+  const debounceTimerRef = useRef(null)
   
   const navigate = useNavigate()
   const { login } = useAuthStore()
@@ -69,49 +71,88 @@ function SignupPage() {
   }
 
   const handleChange = (field, value) => {
-    // 직원번호는 대문자로 변환
-    if (field === 'employeeNumber') {
-      value = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)
-    }
     setFormData({ ...formData, [field]: value })
     // 실시간 검증
     if (errors[field]) {
-      setErrors({ ...errors, [field]: '' })
+      setErrors(prev => ({ ...prev, [field]: '' }))
     }
   }
 
   const checkEmployeeNumberAvailability = async (employeeNumber) => {
     if (!employeeNumber || !validateEmployeeNumber(employeeNumber)) {
-      return
+      return { success: false, exists: null, available: false }
     }
 
+    setCheckingEmployeeNumber(true)
     try {
       const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
       
+      let exists = false
       if (USE_MOCK) {
         // 모크 모드: 로컬 스토리지에서 확인
         const users = JSON.parse(localStorage.getItem('mock-users') || '[]')
-        const exists = users.some((u) => u.employeeNumber === employeeNumber)
-        setEmployeeNumberChecked(!exists)
-        if (exists) {
-          setErrors({ ...errors, employeeNumber: '이미 사용 중인 직원번호입니다.' })
-        } else {
-          setErrors({ ...errors, employeeNumber: '' })
-        }
+        exists = users.some((u) => u.employeeNumber === employeeNumber.toUpperCase())
       } else {
         // 실제 API 호출
         const response = await authAPI.checkEmployeeNumber(employeeNumber)
-        setEmployeeNumberChecked(!response.exists)
-        if (response.exists) {
-          setErrors({ ...errors, employeeNumber: '이미 사용 중인 직원번호입니다.' })
-        } else {
-          setErrors({ ...errors, employeeNumber: '' })
-        }
+        exists = response.exists
       }
+      
+      const isAvailable = !exists
+      setEmployeeNumberChecked(isAvailable)
+      
+      if (exists) {
+        setErrors(prev => ({ ...prev, employeeNumber: '이미 사용 중인 직원번호입니다.' }))
+      } else {
+        setErrors(prev => ({ ...prev, employeeNumber: '' }))
+      }
+      
+      return { success: true, exists, available: isAvailable }
     } catch (error) {
       console.error('직원번호 확인 실패:', error)
+      setErrors(prev => ({ 
+        ...prev, 
+        employeeNumber: '직원번호 확인 중 오류가 발생했습니다. 다시 시도해주세요.' 
+      }))
+      setEmployeeNumberChecked(false)
+      return { success: false, exists: null, available: false, error: error.message }
+    } finally {
+      setCheckingEmployeeNumber(false)
     }
   }
+
+  const handleEmployeeNumberChange = (e) => {
+    const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)
+    
+    handleChange('employeeNumber', value)
+    setEmployeeNumberChecked(false)
+    
+    // 기존 타이머 취소
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+    
+    // 에러 초기화
+    if (errors.employeeNumber) {
+      setErrors(prev => ({ ...prev, employeeNumber: '' }))
+    }
+    
+    // 6자리 입력 완료 시 debounce 후 자동 확인
+    if (value.length === 6) {
+      debounceTimerRef.current = setTimeout(() => {
+        checkEmployeeNumberAvailability(value)
+      }, 500)
+    }
+  }
+
+  // 컴포넌트 언마운트 시 타이머 정리
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+    }
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -135,9 +176,21 @@ function SignupPage() {
 
     // 직원번호 중복 확인
     if (!employeeNumberChecked) {
-      await checkEmployeeNumberAvailability(formData.employeeNumber)
-      if (!employeeNumberChecked) {
-        setErrors({ ...errors, employeeNumber: '직원번호 중복 확인이 필요합니다.' })
+      const result = await checkEmployeeNumberAvailability(formData.employeeNumber)
+      if (!result.success || result.exists) {
+        if (!result.success) {
+          setErrors(prev => ({ 
+            ...prev, 
+            employeeNumber: '직원번호 중복 확인 중 오류가 발생했습니다. 다시 시도해주세요.' 
+          }))
+        } else if (result.exists) {
+          // 에러는 이미 함수 내부에서 설정됨
+        } else {
+          setErrors(prev => ({ 
+            ...prev, 
+            employeeNumber: '직원번호 중복 확인이 필요합니다.' 
+          }))
+        }
         return
       }
     }
@@ -233,27 +286,35 @@ function SignupPage() {
                   id="employeeNumber"
                   type="text"
                   value={formData.employeeNumber}
-                  onChange={(e) => {
-                    handleChange('employeeNumber', e.target.value)
-                    setEmployeeNumberChecked(false)
+                  onChange={handleEmployeeNumberChange}
+                  onBlur={() => {
+                    // onBlur에서도 확인 (6자리가 아닌 경우 대비)
+                    if (formData.employeeNumber.length === 6 && !employeeNumberChecked && !checkingEmployeeNumber) {
+                      checkEmployeeNumberAvailability(formData.employeeNumber)
+                    }
                   }}
-                  onBlur={() => checkEmployeeNumberAvailability(formData.employeeNumber)}
                   className={`input-field pl-10 uppercase ${errors.employeeNumber ? 'border-red-500' : employeeNumberChecked ? 'border-green-500' : ''}`}
                   placeholder="A1B2C3"
                   maxLength={6}
                   required
                 />
-                {employeeNumberChecked && !errors.employeeNumber && (
+                {checkingEmployeeNumber && (
+                  <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 animate-spin" />
+                )}
+                {!checkingEmployeeNumber && employeeNumberChecked && !errors.employeeNumber && (
                   <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500 w-5 h-5" />
                 )}
               </div>
               {errors.employeeNumber && (
                 <p className="mt-1 text-sm text-red-600">{errors.employeeNumber}</p>
               )}
-              {employeeNumberChecked && !errors.employeeNumber && (
+              {checkingEmployeeNumber && (
+                <p className="mt-1 text-xs text-gray-500">중복 확인 중...</p>
+              )}
+              {!checkingEmployeeNumber && employeeNumberChecked && !errors.employeeNumber && (
                 <p className="mt-1 text-sm text-green-600">사용 가능한 직원번호입니다.</p>
               )}
-              {!errors.employeeNumber && formData.employeeNumber && (
+              {!checkingEmployeeNumber && !errors.employeeNumber && formData.employeeNumber && !employeeNumberChecked && (
                 <p className="mt-1 text-xs text-gray-500">6자리 영문과 숫자 조합 (예: A1B2C3)</p>
               )}
             </div>
