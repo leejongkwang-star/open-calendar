@@ -41,7 +41,24 @@ function LoginPage() {
       login(response.user, response.token)
       navigate('/calendar')
     } catch (err) {
-      setError(err.message || err.response?.data?.message || '로그인에 실패했습니다. 직원번호와 비밀번호를 확인해주세요.')
+      // 백엔드에서 반환한 구체적인 메시지를 우선 표시
+      let errorMessage = '로그인에 실패했습니다. 직원번호와 비밀번호를 확인해주세요.'
+      
+      if (err.response?.status === 403) {
+        // 403 오류: 승인 대기, 거부 등 상태별 메시지
+        errorMessage = err.response?.data?.message || '접근이 거부되었습니다. 관리자에게 문의하세요.'
+      } else if (err.response?.status === 401) {
+        // 401 오류: 인증 실패
+        errorMessage = err.response?.data?.message || '직원번호 또는 비밀번호가 올바르지 않습니다.'
+      } else if (err.response?.data?.message) {
+        // 기타 응답 에러 메시지
+        errorMessage = err.response.data.message
+      } else if (err.message) {
+        // 네트워크 오류 등
+        errorMessage = err.message
+      }
+      
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
