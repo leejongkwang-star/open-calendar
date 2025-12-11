@@ -33,8 +33,6 @@ router.get('/', async (req, res, next) => {
     const userId = req.user.id
     const userRole = req.user.role
 
-    console.log(`[팀 목록 조회] 사용자 ID: ${userId}, 권한: ${userRole}`)
-
     // 관리자는 모든 팀 조회, 일반 사용자는 자신이 속한 팀만 조회
     if (userRole === 'ADMIN') {
       // 관리자: 모든 팀 조회
@@ -96,10 +94,12 @@ router.get('/', async (req, res, next) => {
 
       res.json(teams)
     }
-  } catch (error) {
-    console.error('[팀 목록 조회 오류]', error)
-    next(error)
-  }
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[팀 목록 조회 오류]', error)
+      }
+      next(error)
+    }
 })
 
 // 팀 상세 조회
@@ -326,10 +326,12 @@ router.get('/:teamId/members', async (req, res, next) => {
     }))
 
     res.json(formattedMembers)
-  } catch (error) {
-    console.error('[구성원 목록 조회 오류]', error)
-    next(error)
-  }
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[구성원 목록 조회 오류]', error)
+      }
+      next(error)
+    }
 })
 
 // 구성원 추가 (관리자만)
@@ -544,7 +546,9 @@ router.put(
         createdAt: updatedMember.createdAt,
       })
     } catch (error) {
-      console.error('[권한 변경 오류]', error)
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[권한 변경 오류]', error)
+      }
       next(error)
     }
   }

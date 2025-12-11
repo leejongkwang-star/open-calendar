@@ -135,21 +135,15 @@ router.get(
 
         // start나 end가 null이면 기본값 설정 (데이터 오류 방지)
         if (!start) {
-          console.warn(`[이벤트 ${event.id}] startDate와 startTime이 모두 없습니다.`, {
-            id: event.id,
-            title: event.title,
-            startDate: event.startDate,
-            startTime: event.startTime,
-          })
+          if (process.env.NODE_ENV === 'development') {
+            console.warn(`[이벤트 ${event.id}] startDate와 startTime이 모두 없습니다.`)
+          }
           start = new Date() // 기본값: 현재 시간
         }
         if (!end) {
-          console.warn(`[이벤트 ${event.id}] endDate와 endTime이 모두 없습니다.`, {
-            id: event.id,
-            title: event.title,
-            endDate: event.endDate,
-            endTime: event.endTime,
-          })
+          if (process.env.NODE_ENV === 'development') {
+            console.warn(`[이벤트 ${event.id}] endDate와 endTime이 모두 없습니다.`)
+          }
           end = new Date(start.getTime() + 24 * 60 * 60 * 1000) // 기본값: start + 1일
         }
 
@@ -178,56 +172,18 @@ router.get(
       // null이나 undefined인 이벤트 제거
       const validEvents = formattedEvents.filter(event => event && event.start && event.end)
       
-      if (validEvents.length !== formattedEvents.length) {
+      if (process.env.NODE_ENV === 'development' && validEvents.length !== formattedEvents.length) {
         console.warn(`[이벤트 필터링] ${formattedEvents.length}개 중 ${validEvents.length}개만 유효합니다.`)
-      }
-      
-      // 디버깅: 이벤트 개수와 모든 이벤트 정보 출력
-      console.log(`[이벤트 조회] DB에서 ${events.length}개 조회 → ${validEvents.length}개 유효 이벤트`)
-      
-      if (validEvents.length > 0) {
-        console.log(`[이벤트 조회] 모든 이벤트 목록:`)
-        validEvents.forEach((event, index) => {
-          console.log(`  [${index + 1}] ID: ${event.id}, 제목: ${event.title}, 시작: ${event.start}, 종료: ${event.end}`)
-        })
-      } else {
-        console.warn(`[이벤트 조회] 유효한 이벤트가 없습니다.`)
-        if (formattedEvents.length > 0) {
-          console.warn(`[이벤트 조회] formattedEvents 상세:`, formattedEvents.map(e => ({
-            id: e?.id,
-            title: e?.title,
-            hasStart: !!e?.start,
-            hasEnd: !!e?.end,
-            start: e?.start,
-            end: e?.end,
-          })))
-        }
       }
 
       // Date 객체를 ISO 문자열로 변환하여 JSON 직렬화 문제 방지
-      const serializedEvents = validEvents.map(event => {
-        const serialized = {
-          ...event,
-          start: event.start.toISOString(),
-          end: event.end.toISOString(),
-          startDate: event.startDate.toISOString(),
-          endDate: event.endDate.toISOString(),
-        }
-        
-        // 디버깅: 특정 이벤트 로그
-        if (event.id === 14) {
-          const rawEvent = events.find(e => e.id === 14)
-          console.log('[백엔드 이벤트 14]', {
-            'DB 원본 endDate (Prisma raw)': rawEvent?.endDate,
-            'formattedEvents의 endDate': event.endDate,
-            '계산된 end': event.end,
-            '직렬화된 endDate': serialized.endDate,
-            '직렬화된 end': serialized.end,
-          })
-        }
-        
-        return serialized
-      })
+      const serializedEvents = validEvents.map(event => ({
+        ...event,
+        start: event.start.toISOString(),
+        end: event.end.toISOString(),
+        startDate: event.startDate.toISOString(),
+        endDate: event.endDate.toISOString(),
+      }))
 
       res.json(serializedEvents)
     } catch (error) {

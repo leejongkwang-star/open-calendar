@@ -42,7 +42,9 @@ router.get('/check-employee-number', async (req, res, next) => {
 
     res.json({ exists: !!user })
   } catch (error) {
-    console.error('직원번호 확인 오류:', error)
+    if (process.env.NODE_ENV === 'development') {
+      console.error('직원번호 확인 오류:', error)
+    }
     next(error)
   }
 })
@@ -223,7 +225,9 @@ router.post(
 
       // JWT_SECRET 확인
       if (!process.env.JWT_SECRET) {
-        console.error('JWT_SECRET이 설정되지 않았습니다.')
+        if (process.env.NODE_ENV === 'development') {
+          console.error('JWT_SECRET이 설정되지 않았습니다.')
+        }
         return res.status(500).json({ 
           message: '서버 설정 오류가 발생했습니다. JWT_SECRET을 확인하세요.' 
         })
@@ -246,8 +250,10 @@ router.post(
         token,
       })
     } catch (error) {
-      console.error('로그인 오류:', error)
-      console.error('오류 스택:', error.stack)
+      if (process.env.NODE_ENV === 'development') {
+        console.error('로그인 오류:', error)
+        console.error('오류 스택:', error.stack)
+      }
       next(error)
     }
   }

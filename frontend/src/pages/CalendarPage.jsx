@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Calendar, momentLocalizer } from 'react-big-calendar'
 import moment from 'moment'
 import 'moment/locale/ko'
@@ -390,7 +390,7 @@ function CalendarPage() {
   }, [view, filteredEvents])
 
   // 팀 목록 로드
-  const loadTeams = async () => {
+  const loadTeams = useCallback(async () => {
     try {
       const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
       
@@ -408,12 +408,14 @@ function CalendarPage() {
         // 모든 팀의 일정을 조회하므로 selectedTeamId가 없어도 문제없음
       }
     } catch (error) {
-      console.error('팀 로드 실패:', error)
+      if (import.meta.env.DEV) {
+        console.error('팀 로드 실패:', error)
+      }
     }
-  }
+  }, [])
 
   // 이벤트 저장 핸들러
-  const handleSaveEvent = async (eventData) => {
+  const handleSaveEvent = useCallback(async (eventData) => {
     try {
       const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
       
@@ -492,7 +494,9 @@ function CalendarPage() {
       setShowEventModal(false)
       setSelectedEvent(null)
     } catch (error) {
-      console.error('이벤트 저장 실패:', error)
+      if (import.meta.env.DEV) {
+        console.error('이벤트 저장 실패:', error)
+      }
       const errorMessage = error.response?.data?.message || error.message || '이벤트 저장에 실패했습니다.'
       alert(errorMessage)
       // 인증 오류(401)만 로그인 페이지로 리다이렉트
@@ -504,10 +508,10 @@ function CalendarPage() {
       }
       // 403 오류는 권한 부족이므로 에러 메시지만 표시하고 모달은 유지
     }
-  }
+  }, [selectedEvent, selectedTeamId, user, loadEvents])
 
   // 이벤트 삭제 핸들러
-  const handleDeleteEvent = async (eventId) => {
+  const handleDeleteEvent = useCallback(async (eventId) => {
     if (!window.confirm('이 일정을 삭제하시겠습니까?')) return
 
     try {
@@ -523,7 +527,9 @@ function CalendarPage() {
       setShowEventModal(false)
       setSelectedEvent(null)
     } catch (error) {
-      console.error('이벤트 삭제 실패:', error)
+      if (import.meta.env.DEV) {
+        console.error('이벤트 삭제 실패:', error)
+      }
       const errorMessage = error.response?.data?.message || error.message || '이벤트 삭제에 실패했습니다.'
       alert(errorMessage)
       // 인증 오류(401)만 로그인 페이지로 리다이렉트
@@ -534,10 +540,10 @@ function CalendarPage() {
         }, 2000)
       }
     }
-  }
+  }, [loadEvents])
 
   // 이벤트 로드
-  const loadEvents = async () => {
+  const loadEvents = useCallback(async () => {
     try {
       const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
       
@@ -553,8 +559,6 @@ function CalendarPage() {
         // 날짜 형식 변환 (백엔드에서 Date 객체로 받음)
         // react-big-calendar는 end 날짜를 exclusive로 처리하므로,
         // 종료일까지 표시하려면 end를 종료일 다음 날 자정으로 설정해야 함
-        console.log('[프론트엔드] 백엔드에서 받은 원본 데이터:', data)
-        console.log('[프론트엔드] 받은 이벤트 개수:', data?.length || 0)
         
         const formattedEvents = (data || [])
           .map((event, index) => {
@@ -600,17 +604,23 @@ function CalendarPage() {
               
               // 유효한 날짜인지 확인
               if (start && isNaN(start.getTime())) {
-                console.warn(`[이벤트 ${event.id}] 유효하지 않은 start 날짜:`, event.start, event)
+                if (import.meta.env.DEV) {
+                  console.warn(`[이벤트 ${event.id}] 유효하지 않은 start 날짜:`, event.start)
+                }
                 return null
               }
               if (end && isNaN(end.getTime())) {
-                console.warn(`[이벤트 ${event.id}] 유효하지 않은 end 날짜:`, event.end, event)
+                if (import.meta.env.DEV) {
+                  console.warn(`[이벤트 ${event.id}] 유효하지 않은 end 날짜:`, event.end)
+                }
                 return null
               }
               
               // start나 end가 없으면 제외
               if (!start || !end) {
-                console.warn(`[이벤트 ${event.id}] 날짜 정보가 없음:`, { start, end, event })
+                if (import.meta.env.DEV) {
+                  console.warn(`[이벤트 ${event.id}] 날짜 정보가 없음`)
+                }
                 return null
               }
               
@@ -662,26 +672,21 @@ function CalendarPage() {
                 originalEndDate: originalEndDate, // 원본 종료일 (수정 모달용)
               }
             } catch (error) {
-              console.error(`[이벤트 ${event?.id || index}] 날짜 파싱 오류:`, error, event)
+              if (import.meta.env.DEV) {
+                console.error(`[이벤트 ${event?.id || index}] 날짜 파싱 오류:`, error)
+              }
               return null
             }
           })
           .filter(event => event !== null) // null인 이벤트 제거
           
-        console.log('[프론트엔드] 이벤트 로드 성공:', formattedEvents.length, '개')
-        if (formattedEvents.length > 0) {
-          console.log('[프론트엔드] 모든 이벤트 목록:')
-          formattedEvents.forEach((event, index) => {
-            console.log(`  [${index + 1}] ID: ${event.id}, 제목: ${event.title}, 시작: ${event.start}, 종료: ${event.end}`)
-          })
-        } else {
-          console.warn('[프론트엔드] 유효한 이벤트가 없습니다.')
-        }
         setEvents(formattedEvents)
       }
     } catch (error) {
-      console.error('이벤트 로드 실패:', error)
-      console.error('에러 상세:', error.response?.data || error.message)
+      if (import.meta.env.DEV) {
+        console.error('이벤트 로드 실패:', error)
+        console.error('에러 상세:', error.response?.data || error.message)
+      }
       setEvents([])
       // 인증 오류(401)만 로그인 페이지로 리다이렉트
       // 403(권한 없음)은 권한 부족이지 인증 실패가 아니므로 리다이렉트하지 않음
@@ -690,9 +695,6 @@ function CalendarPage() {
         setTimeout(() => {
           window.location.href = '/login'
         }, 1000)
-      } else {
-        const errorMessage = error.response?.data?.message || error.message || '일정을 불러오는데 실패했습니다.'
-        console.error('일정 로드 오류:', errorMessage)
       }
     }
   }
@@ -983,4 +985,3 @@ function CalendarPage() {
 }
 
 export default CalendarPage
-

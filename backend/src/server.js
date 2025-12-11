@@ -48,11 +48,13 @@ app.use(cors({
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
-// 로깅 미들웨어
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`)
-  next()
-})
+// 로깅 미들웨어 (개발 환경에서만)
+if (process.env.NODE_ENV === 'development') {
+  app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`)
+    next()
+  })
+}
 
 // 헬스 체크
 app.get('/health', (req, res) => {
