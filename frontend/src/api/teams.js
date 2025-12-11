@@ -1,6 +1,12 @@
 import api from '../utils/api'
 
 export const teamsAPI = {
+  // 공개 팀 목록 조회 (회원가입용, 인증 불필요)
+  getPublicTeams: async () => {
+    const response = await api.get('/teams/public')
+    return response.data
+  },
+  
   getTeams: async () => {
     const response = await api.get('/teams')
     return response.data

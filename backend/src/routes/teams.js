@@ -5,6 +5,25 @@ import { authenticate, requireAdmin } from '../middleware/auth.js'
 
 const router = express.Router()
 
+// 팀 목록 조회 (공개, 회원가입용)
+router.get('/public', async (req, res, next) => {
+  try {
+    // 회원가입 시 사용할 수 있도록 인증 없이 모든 팀 조회
+    const teams = await prisma.team.findMany({
+      select: {
+        id: true,
+        name: true,
+        description: true,
+      },
+      orderBy: { name: 'asc' },
+    })
+
+    res.json(teams)
+  } catch (error) {
+    next(error)
+  }
+})
+
 // 모든 라우트에 인증 미들웨어 적용
 router.use(authenticate)
 

@@ -89,6 +89,9 @@ router.post(
       .matches(/^[A-Za-z0-9]{6}$/)
       .withMessage('직원번호는 6자리 영문과 숫자 조합이어야 합니다.'),
     body('password').isLength({ min: 8 }).withMessage('비밀번호는 8자 이상이어야 합니다.'),
+    body('teamId').optional().isInt().withMessage('팀 ID는 숫자여야 합니다.'),
+    body('position').optional().trim().isLength({ max: 50 }).withMessage('직급은 50자 이하여야 합니다.'),
+    body('phone').optional().trim().matches(/^[0-9-]+$/).withMessage('전화번호는 숫자와 하이픈(-)만 입력 가능합니다.'),
   ],
   async (req, res, next) => {
     try {
@@ -97,7 +100,7 @@ router.post(
         return res.status(400).json({ message: errors.array()[0].msg, errors: errors.array() })
       }
 
-      const { name, employeeNumber, password } = req.body
+      const { name, employeeNumber, password, teamId, position, phone } = req.body
 
       // 직원번호 중복 확인
       const existingUser = await prisma.user.findUnique({
@@ -108,31 +111,59 @@ router.post(
         return res.status(409).json({ message: '이미 사용 중인 직원번호입니다.' })
       }
 
+      // 팀 ID가 제공된 경우 팀 존재 확인
+      if (teamId) {
+        const team = await prisma.team.findUnique({
+          where: { id: parseInt(teamId) },
+        })
+        if (!team) {
+          return res.status(404).json({ message: '해당 팀을 찾을 수 없습니다.' })
+        }
+      }
+
       // 비밀번호 암호화
       const hashedPassword = await bcrypt.hash(password, 10)
 
-      // 사용자 생성 (승인 대기 상태)
-      const user = await prisma.user.create({
-        data: {
-          name,
-          employeeNumber: employeeNumber.toUpperCase(),
-          password: hashedPassword,
-          role: 'MEMBER',
-          status: 'PENDING',
-        },
-        select: {
-          id: true,
-          employeeNumber: true,
-          name: true,
-          role: true,
-          status: true,
-          createdAt: true,
-        },
+      // 사용자 생성 및 팀 멤버 추가 (트랜잭션)
+      const result = await prisma.$transaction(async (tx) => {
+        // 사용자 생성 (승인 대기 상태)
+        const user = await tx.user.create({
+          data: {
+            name,
+            employeeNumber: employeeNumber.toUpperCase(),
+            password: hashedPassword,
+            role: 'MEMBER',
+            status: 'PENDING',
+          },
+          select: {
+            id: true,
+            employeeNumber: true,
+            name: true,
+            role: true,
+            status: true,
+            createdAt: true,
+          },
+        })
+
+        // 팀 ID가 제공된 경우 팀 멤버 추가
+        if (teamId) {
+          await tx.teamMember.create({
+            data: {
+              teamId: parseInt(teamId),
+              userId: user.id,
+              position: position || null,
+              phone: phone || null,
+              role: 'MEMBER',
+            },
+          })
+        }
+
+        return user
       })
 
       res.status(201).json({
         message: '회원가입이 완료되었습니다. 관리자 승인 후 로그인할 수 있습니다.',
-        user,
+        user: result,
       })
     } catch (error) {
       next(error)
@@ -390,11 +421,35 @@ router.get('/users', authenticate, requireAdmin, async (req, res, next) => {
         createdAt: true,
         approvedAt: true,
         approvedBy: true,
+        teams: {
+          select: {
+            id: true,
+            teamId: true,
+            position: true,
+            phone: true,
+            team: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+          take: 1, // 첫 번째 팀만 (여러 팀이 있을 경우)
+        },
       },
       orderBy: { createdAt: 'desc' },
     })
 
-    res.json(users)
+    // 팀 정보를 평탄화하여 응답
+    const usersWithTeam = users.map((user) => ({
+      ...user,
+      teamId: user.teams[0]?.teamId || null,
+      position: user.teams[0]?.position || null,
+      phone: user.teams[0]?.phone || null,
+      teamName: user.teams[0]?.team?.name || null,
+    }))
+
+    res.json(usersWithTeam)
   } catch (error) {
     next(error)
   }
@@ -409,6 +464,9 @@ router.put(
     body('name').optional().trim().isLength({ min: 2 }).withMessage('이름은 2자 이상이어야 합니다.'),
     body('role').optional().isIn(['ADMIN', 'MEMBER']).withMessage('권한이 올바르지 않습니다.'),
     body('status').optional().isIn(['PENDING', 'APPROVED', 'REJECTED']).withMessage('상태가 올바르지 않습니다.'),
+    body('teamId').optional().isInt().withMessage('팀 ID는 숫자여야 합니다.'),
+    body('position').optional().trim().isLength({ max: 50 }).withMessage('직급은 50자 이하여야 합니다.'),
+    body('phone').optional().trim().matches(/^[0-9-]+$/).withMessage('전화번호는 숫자와 하이픈(-)만 입력 가능합니다.'),
   ],
   async (req, res, next) => {
     try {
@@ -418,7 +476,7 @@ router.put(
       }
 
       const { userId } = req.params
-      const { name, role, status } = req.body
+      const { name, role, status, teamId, position, phone } = req.body
 
       const user = await prisma.user.findUnique({
         where: { id: parseInt(userId) },
@@ -438,36 +496,110 @@ router.put(
         }
       }
 
-      const updateData = {}
-      if (name) updateData.name = name
-      if (role) updateData.role = role
-      if (status) {
-        updateData.status = status
-        if (status === 'APPROVED' && user.status !== 'APPROVED') {
-          updateData.approvedAt = new Date()
-          updateData.approvedBy = req.user.id
+      // 트랜잭션으로 사용자 정보 및 팀 멤버 정보 업데이트
+      const result = await prisma.$transaction(async (tx) => {
+        const updateData = {}
+        if (name) updateData.name = name
+        if (role) updateData.role = role
+        if (status) {
+          updateData.status = status
+          if (status === 'APPROVED' && user.status !== 'APPROVED') {
+            updateData.approvedAt = new Date()
+            updateData.approvedBy = req.user.id
+          }
         }
-      }
 
-      const updatedUser = await prisma.user.update({
-        where: { id: parseInt(userId) },
-        data: updateData,
-        select: {
-          id: true,
-          employeeNumber: true,
-          name: true,
-          role: true,
-          status: true,
-          createdAt: true,
-          approvedAt: true,
-        },
+        const updatedUser = await tx.user.update({
+          where: { id: parseInt(userId) },
+          data: updateData,
+          select: {
+            id: true,
+            employeeNumber: true,
+            name: true,
+            role: true,
+            status: true,
+            createdAt: true,
+            approvedAt: true,
+          },
+        })
+
+        // 팀 ID가 제공된 경우 팀 멤버 정보 업데이트
+        if (teamId !== undefined) {
+          // 팀 존재 확인
+          if (teamId) {
+            const team = await tx.team.findUnique({
+              where: { id: parseInt(teamId) },
+            })
+            if (!team) {
+              throw new Error('해당 팀을 찾을 수 없습니다.')
+            }
+          }
+
+          // 기존 팀 멤버 조회
+          const existingTeamMember = await tx.teamMember.findFirst({
+            where: { userId: parseInt(userId) },
+          })
+
+          if (teamId) {
+            // 팀 ID가 있는 경우: 업데이트 또는 생성
+            if (existingTeamMember) {
+              // 기존 팀 멤버가 있으면 업데이트
+              const updateData = {
+                teamId: parseInt(teamId),
+              }
+              if (position !== undefined) updateData.position = position || null
+              if (phone !== undefined) updateData.phone = phone || null
+              await tx.teamMember.update({
+                where: { id: existingTeamMember.id },
+                data: updateData,
+              })
+            } else {
+              // 기존 팀 멤버가 없으면 생성
+              await tx.teamMember.create({
+                data: {
+                  teamId: parseInt(teamId),
+                  userId: parseInt(userId),
+                  position: position || null,
+                  phone: phone || null,
+                  role: 'MEMBER',
+                },
+              })
+            }
+          } else {
+            // 팀 ID가 null인 경우: 기존 팀 멤버 삭제
+            if (existingTeamMember) {
+              await tx.teamMember.delete({
+                where: { id: existingTeamMember.id },
+              })
+            }
+          }
+        } else if (position !== undefined || phone !== undefined) {
+          // 팀 ID는 변경하지 않고 직급 또는 전화번호만 업데이트
+          const existingTeamMember = await tx.teamMember.findFirst({
+            where: { userId: parseInt(userId) },
+          })
+          if (existingTeamMember) {
+            const updateData = {}
+            if (position !== undefined) updateData.position = position || null
+            if (phone !== undefined) updateData.phone = phone || null
+            await tx.teamMember.update({
+              where: { id: existingTeamMember.id },
+              data: updateData,
+            })
+          }
+        }
+
+        return updatedUser
       })
 
       res.json({
         message: '회원 정보가 수정되었습니다.',
-        user: updatedUser,
+        user: result,
       })
     } catch (error) {
+      if (error.message === '해당 팀을 찾을 수 없습니다.') {
+        return res.status(404).json({ message: error.message })
+      }
       next(error)
     }
   }

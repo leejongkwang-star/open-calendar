@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { authAPI } from '../api/auth'
+import { teamsAPI } from '../api/teams'
 import { mockSignup, loadMockData } from '../utils/mockData'
-import { Hash, Lock, User, AlertCircle, CheckCircle, Loader2 } from 'lucide-react'
+import { Hash, Lock, User, AlertCircle, CheckCircle, Loader2, Building2, Briefcase, Phone } from 'lucide-react'
 
 function SignupPage() {
   const [formData, setFormData] = useState({
@@ -11,11 +12,15 @@ function SignupPage() {
     employeeNumber: '',
     password: '',
     confirmPassword: '',
+    teamId: '',
+    position: '',
   })
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
   const [employeeNumberChecked, setEmployeeNumberChecked] = useState(false)
   const [checkingEmployeeNumber, setCheckingEmployeeNumber] = useState(false)
+  const [teams, setTeams] = useState([])
+  const [loadingTeams, setLoadingTeams] = useState(false)
   const debounceTimerRef = useRef(null)
   
   const navigate = useNavigate()
@@ -23,7 +28,29 @@ function SignupPage() {
 
   useEffect(() => {
     loadMockData()
+    // 팀 목록 로드
+    loadTeams()
   }, [])
+
+  const loadTeams = async () => {
+    setLoadingTeams(true)
+    try {
+      const USE_MOCK = !import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_USE_MOCK === 'true'
+      if (USE_MOCK) {
+        // 모크 데이터 사용 (로컬 스토리지에서)
+        const mockTeams = JSON.parse(localStorage.getItem('mock-teams') || '[]')
+        setTeams(mockTeams)
+      } else {
+        const teamsData = await teamsAPI.getPublicTeams()
+        setTeams(teamsData)
+      }
+    } catch (error) {
+      console.error('팀 목록 로드 실패:', error)
+      setErrors(prev => ({ ...prev, team: '팀 목록을 불러올 수 없습니다.' }))
+    } finally {
+      setLoadingTeams(false)
+    }
+  }
 
   const validateName = (name) => {
     if (!name || name.length < 2) {
@@ -166,13 +193,15 @@ function SignupPage() {
     const employeeNumberError = validateEmployeeNumber(formData.employeeNumber)
     const passwordError = validatePassword(formData.password)
     const confirmPasswordError = validateConfirmPassword(formData.password, formData.confirmPassword)
+    const teamError = !formData.teamId ? '소속 팀을 선택해주세요.' : ''
 
-    if (nameError || employeeNumberError || passwordError || confirmPasswordError) {
+    if (nameError || employeeNumberError || passwordError || confirmPasswordError || teamError) {
       setErrors({
         name: nameError,
         employeeNumber: employeeNumberError,
         password: passwordError,
         confirmPassword: confirmPasswordError,
+        teamId: teamError,
       })
       return
     }
@@ -373,9 +402,85 @@ function SignupPage() {
               )}
             </div>
 
+            <div>
+              <label htmlFor="teamId" className="block text-sm font-medium text-gray-700 mb-2">
+                소속 팀 <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
+                <select
+                  id="teamId"
+                  value={formData.teamId}
+                  onChange={(e) => handleChange('teamId', e.target.value)}
+                  className={`input-field pl-10 appearance-none ${errors.teamId ? 'border-red-500' : ''}`}
+                  required
+                >
+                  <option value="">팀을 선택하세요</option>
+                  {loadingTeams ? (
+                    <option disabled>팀 목록 로딩 중...</option>
+                  ) : (
+                    teams.map((team) => (
+                      <option key={team.id} value={team.id}>
+                        {team.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+              {errors.teamId && (
+                <p className="mt-1 text-sm text-red-600">{errors.teamId}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="position" className="block text-sm font-medium text-gray-700 mb-2">
+                직급
+              </label>
+              <div className="relative">
+                <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  id="position"
+                  type="text"
+                  value={formData.position}
+                  onChange={(e) => handleChange('position', e.target.value)}
+                  className={`input-field pl-10 ${errors.position ? 'border-red-500' : ''}`}
+                  placeholder="예: 대리, 과장, 차장 등"
+                  maxLength={50}
+                />
+              </div>
+              {errors.position && (
+                <p className="mt-1 text-sm text-red-600">{errors.position}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
+                연락처 (핸드폰)
+              </label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  id="phone"
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => {
+                    // 숫자와 하이픈만 허용
+                    const value = e.target.value.replace(/[^0-9-]/g, '')
+                    handleChange('phone', value)
+                  }}
+                  className={`input-field pl-10 ${errors.phone ? 'border-red-500' : ''}`}
+                  placeholder="010-1234-5678"
+                  maxLength={20}
+                />
+              </div>
+              {errors.phone && (
+                <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
+              )}
+            </div>
+
             <button
               type="submit"
-              disabled={loading || !formData.name || !formData.employeeNumber || !formData.password || !formData.confirmPassword}
+              disabled={loading || !formData.name || !formData.employeeNumber || !formData.password || !formData.confirmPassword || !formData.teamId}
               className="btn-primary w-full"
             >
               {loading ? '가입 중...' : '회원가입'}

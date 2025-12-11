@@ -1041,6 +1041,9 @@ function AdminPage() {
                   name: formData.get('name'),
                   role: formData.get('role'),
                   status: formData.get('status'),
+                  teamId: formData.get('teamId') || null,
+                  position: formData.get('position') || null,
+                  phone: formData.get('phone') || null,
                 })
               }}
               className="p-6 space-y-4"
@@ -1067,6 +1070,48 @@ function AdminPage() {
                   value={selectedUser.employeeNumber}
                   className="input-field bg-gray-100"
                   disabled
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  소속 팀
+                </label>
+                <select name="teamId" defaultValue={selectedUser.teamId || ''} className="input-field">
+                  <option value="">팀 없음</option>
+                  {teams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  직급
+                </label>
+                <input
+                  type="text"
+                  name="position"
+                  defaultValue={selectedUser.position || ''}
+                  className="input-field"
+                  placeholder="예: 대리, 과장, 차장 등"
+                  maxLength={50}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  연락처 (핸드폰)
+                </label>
+                <input
+                  type="tel"
+                  name="phone"
+                  defaultValue={selectedUser.phone || ''}
+                  className="input-field"
+                  placeholder="010-1234-5678"
+                  maxLength={20}
                 />
               </div>
 
