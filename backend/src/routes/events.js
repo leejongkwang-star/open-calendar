@@ -92,58 +92,12 @@ router.get(
       })
 
       // react-big-calendar 형식으로 변환
-      // 성능 최적화: 간단한 변환만 수행 (복잡한 로직은 프론트엔드에서 처리)
+      // 성능 최적화: startDate와 endDate에 이미 시간이 포함되어 있으므로 그대로 사용
       const formattedEvents = events.map((event) => {
-        // startDate와 startTime 결합 로직 (간소화)
-        let start = null
-        
-        if (event.startDate) {
-          start = new Date(event.startDate)
-          
-          // startTime이 있고 startDate가 자정(00:00:00)이면 startTime의 시간을 적용
-          if (event.startTime) {
-            const startDateObj = new Date(event.startDate)
-            const startTimeObj = new Date(event.startTime)
-            
-            if (startDateObj.getHours() === 0 && startDateObj.getMinutes() === 0 && 
-                (startTimeObj.getHours() !== 0 || startTimeObj.getMinutes() !== 0)) {
-              startDateObj.setHours(startTimeObj.getHours(), startTimeObj.getMinutes(), 
-                                   startTimeObj.getSeconds(), startTimeObj.getMilliseconds())
-              start = startDateObj
-            }
-          }
-        } else if (event.startTime) {
-          start = new Date(event.startTime)
-        }
-
-        // endDate와 endTime 결합 로직 (간소화)
-        let end = null
-        
-        if (event.endDate) {
-          end = new Date(event.endDate)
-          
-          if (event.endTime) {
-            const endDateObj = new Date(event.endDate)
-            const endTimeObj = new Date(event.endTime)
-            
-            if (endDateObj.getHours() === 0 && endDateObj.getMinutes() === 0 && 
-                (endTimeObj.getHours() !== 0 || endTimeObj.getMinutes() !== 0)) {
-              endDateObj.setHours(endTimeObj.getHours(), endTimeObj.getMinutes(), 
-                                 endTimeObj.getSeconds(), endTimeObj.getMilliseconds())
-              end = endDateObj
-            }
-          }
-        } else if (event.endTime) {
-          end = new Date(event.endTime)
-        }
-
-        // start나 end가 null이면 기본값 설정
-        if (!start) {
-          start = new Date()
-        }
-        if (!end) {
-          end = new Date(start.getTime() + 24 * 60 * 60 * 1000)
-        }
+        // startDate와 endDate에 이미 시간이 포함되어 있으므로 그대로 사용
+        // startTime과 endTime은 이전 호환성을 위해 남겨두었지만 실제로는 사용하지 않음
+        const start = event.startDate ? new Date(event.startDate) : new Date()
+        const end = event.endDate ? new Date(event.endDate) : new Date(start.getTime() + 24 * 60 * 60 * 1000)
 
         // DB 원본 날짜 저장
         const originalEndDate = event.endDate ? new Date(event.endDate) : end

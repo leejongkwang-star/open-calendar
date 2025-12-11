@@ -285,13 +285,21 @@ function CalendarPage() {
             const originalEndDate = event.endDate ? new Date(event.endDate) : new Date(end)
             
             // react-big-calendar는 end를 exclusive로 처리하므로
-            // 월 뷰에서는 종료일 다음 날 00:00:00으로 설정 (종료일까지만 표시)
-            const endHours = end.getHours()
-            const endMinutes = end.getMinutes()
-            const endSeconds = end.getSeconds()
-            const displayEnd = (endHours !== 0 || endMinutes !== 0 || endSeconds !== 0)
-              ? new Date(end.getFullYear(), end.getMonth(), end.getDate(), endHours, endMinutes + 1, 0) // 일 뷰: 실제 end 시간 + 1분
-              : new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1, 0, 0, 0, 0) // 월 뷰: 종료일 다음 날 00:00:00
+            // startDate와 endDate가 같은 날이면 (하루짜리 일정) 시작일 다음 날 00:00:00으로 설정
+            // 다른 날이면 (여러 날짜 일정) 종료일 다음 날 00:00:00으로 설정
+            const startDate = start.getFullYear() * 10000 + (start.getMonth() + 1) * 100 + start.getDate()
+            const endDate = end.getFullYear() * 10000 + (end.getMonth() + 1) * 100 + end.getDate()
+            const isSameDay = startDate === endDate
+            
+            let displayEnd
+            if (isSameDay) {
+              // 하루짜리 일정: 시작일 다음 날 00:00:00으로 설정하여 하루만 표시
+              // react-big-calendar는 end를 exclusive로 처리하므로 다음 날 00:00:00이면 해당 날까지만 표시됨
+              displayEnd = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1, 0, 0, 0, 0)
+            } else {
+              // 여러 날짜 일정: 종료일 다음 날 00:00:00으로 설정
+              displayEnd = new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1, 0, 0, 0, 0)
+            }
             
             return {
               ...event,
