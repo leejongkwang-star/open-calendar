@@ -53,9 +53,20 @@ router.get(
         }
       }
 
+      // 성능 최적화: 필요한 필드만 선택하여 조회
       const events = await prisma.event.findMany({
         where,
-        include: {
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          startDate: true,
+          endDate: true,
+          startTime: true,
+          endTime: true,
+          eventType: true,
+          userId: true,
+          teamId: true,
           user: {
             select: {
               id: true,
@@ -81,13 +92,12 @@ router.get(
       })
 
       // react-big-calendar 형식으로 변환
-      // 이전 데이터 호환성: startTime/endTime이 별도로 있는 경우 startDate/endDate와 결합
+      // 성능 최적화: 간단한 변환만 수행 (복잡한 로직은 프론트엔드에서 처리)
       const formattedEvents = events.map((event) => {
         // startDate와 startTime 결합 로직 (간소화)
         let start = null
         
         if (event.startDate) {
-          // startDate가 있으면 우선 사용
           start = new Date(event.startDate)
           
           // startTime이 있고 startDate가 자정(00:00:00)이면 startTime의 시간을 적용
@@ -95,7 +105,6 @@ router.get(
             const startDateObj = new Date(event.startDate)
             const startTimeObj = new Date(event.startTime)
             
-            // startDate가 자정이고 startTime이 다른 시간이면 결합
             if (startDateObj.getHours() === 0 && startDateObj.getMinutes() === 0 && 
                 (startTimeObj.getHours() !== 0 || startTimeObj.getMinutes() !== 0)) {
               startDateObj.setHours(startTimeObj.getHours(), startTimeObj.getMinutes(), 
@@ -104,7 +113,6 @@ router.get(
             }
           }
         } else if (event.startTime) {
-          // startDate가 없고 startTime만 있는 경우
           start = new Date(event.startTime)
         }
 
@@ -112,15 +120,12 @@ router.get(
         let end = null
         
         if (event.endDate) {
-          // endDate가 있으면 우선 사용
           end = new Date(event.endDate)
           
-          // endTime이 있고 endDate가 자정(00:00:00)이면 endTime의 시간을 적용
           if (event.endTime) {
             const endDateObj = new Date(event.endDate)
             const endTimeObj = new Date(event.endTime)
             
-            // endDate가 자정이고 endTime이 다른 시간이면 결합
             if (endDateObj.getHours() === 0 && endDateObj.getMinutes() === 0 && 
                 (endTimeObj.getHours() !== 0 || endTimeObj.getMinutes() !== 0)) {
               endDateObj.setHours(endTimeObj.getHours(), endTimeObj.getMinutes(), 
@@ -129,25 +134,18 @@ router.get(
             }
           }
         } else if (event.endTime) {
-          // endDate가 없고 endTime만 있는 경우
           end = new Date(event.endTime)
         }
 
-        // start나 end가 null이면 기본값 설정 (데이터 오류 방지)
+        // start나 end가 null이면 기본값 설정
         if (!start) {
-          if (process.env.NODE_ENV === 'development') {
-            console.warn(`[이벤트 ${event.id}] startDate와 startTime이 모두 없습니다.`)
-          }
-          start = new Date() // 기본값: 현재 시간
+          start = new Date()
         }
         if (!end) {
-          if (process.env.NODE_ENV === 'development') {
-            console.warn(`[이벤트 ${event.id}] endDate와 endTime이 모두 없습니다.`)
-          }
-          end = new Date(start.getTime() + 24 * 60 * 60 * 1000) // 기본값: start + 1일
+          end = new Date(start.getTime() + 24 * 60 * 60 * 1000)
         }
 
-        // DB 원본 날짜 저장 (프론트엔드에서 실제 종료일 계산용)
+        // DB 원본 날짜 저장
         const originalEndDate = event.endDate ? new Date(event.endDate) : end
         
         return {

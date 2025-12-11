@@ -114,6 +114,8 @@ model Event {
   @@index([teamId])
   @@index([startDate])
   @@index([endDate])
+  @@index([startDate, endDate]) // 복합 인덱스: 날짜 범위 쿼리 최적화
+  @@index([teamId, startDate, endDate]) // 복합 인덱스: 팀별 날짜 범위 쿼리 최적화
   @@map("events")
 }
 
