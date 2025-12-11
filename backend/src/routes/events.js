@@ -61,8 +61,6 @@ router.get(
               id: true,
               name: true,
               employeeNumber: true,
-            },
-            include: {
               teams: {
                 select: {
                   phone: true,
