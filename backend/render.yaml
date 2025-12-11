@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: calendar-backend
+    env: node
+    buildCommand: npm install && npm run prisma:generate
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: CORS_ORIGIN
+        sync: false
+
+

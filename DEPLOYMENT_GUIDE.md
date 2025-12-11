@@ -22,11 +22,11 @@
 
 ```
 open-calendar-app/
-├── 캘린더프론트엔드/    # React + Vite 프론트엔드
+├── frontend/    # React + Vite 프론트엔드
 │   ├── src/
 │   ├── package.json
 │   └── vite.config.js
-├── 캘린더백엔드/        # Node.js + Express 백엔드
+├── backend/        # Node.js + Express 백엔드
 │   ├── src/
 │   ├── prisma/
 │   └── package.json
@@ -60,7 +60,7 @@ open-calendar-app/
 ### 1. 프로덕션 빌드
 
 ```bash
-cd 캘린더프론트엔드
+cd frontend
 npm install
 npm run build
 ```
@@ -92,7 +92,7 @@ npm run preview
 ### 1. 프로덕션 준비
 
 ```bash
-cd 캘린더백엔드
+cd backend
 npm install --production
 ```
 
@@ -193,7 +193,9 @@ CORS_ORIGIN="https://your-frontend-domain.com"
 
 ## 🚀 배포 플랫폼별 가이드
 
-### 옵션 1: Vercel (프론트엔드) + Railway/Render (백엔드) - 권장
+### ⭐ 권장 구성: Vercel (프론트엔드) + Render (백엔드)
+
+**이 프로젝트는 Vercel(프론트엔드) + Render(백엔드) 조합으로 배포합니다.**
 
 #### 프론트엔드 (Vercel)
 
@@ -206,7 +208,7 @@ CORS_ORIGIN="https://your-frontend-domain.com"
    npm i -g vercel
    
    # 배포
-   cd 캘린더프론트엔드
+   cd frontend
    vercel
    ```
 
@@ -219,35 +221,49 @@ CORS_ORIGIN="https://your-frontend-domain.com"
    - Output Directory: `dist`
    - Install Command: `npm install`
 
-#### 백엔드 (Railway)
+#### 백엔드 (Render)
 
-1. **Railway 계정 생성**
-   - [Railway](https://railway.app) 접속 및 가입
+1. **Render 계정 생성**
+   - [Render](https://render.com) 접속 및 가입
+   - GitHub 계정으로 로그인 (권장)
 
 2. **프로젝트 배포**
-   - New Project → Deploy from GitHub
-   - `캘린더백엔드` 폴더 선택
+   - **New** → **Web Service** 클릭
+   - **Connect GitHub** 클릭
+   - 리포지토리 선택 및 연결
+   - **서비스 설정**:
+     - **Name**: `calendar-backend` (또는 원하는 이름)
+     - **Region**: 가장 가까운 지역 선택 (예: Singapore)
+     - **Branch**: `main` (또는 기본 브랜치)
+     - **Root Directory**: `backend`
+     - **Build Command**: `npm install && npm run prisma:generate`
+     - **Start Command**: `npm start`
 
 3. **환경 변수 설정**
-   - Variables 탭에서 환경 변수 추가:
-     - `DATABASE_URL`
-     - `JWT_SECRET`
-     - `CORS_ORIGIN`
-     - `NODE_ENV=production`
+   - **Environment Variables** 섹션에서 다음 변수 추가:
+     - `NODE_ENV` = `production`
+     - `PORT` = `3001`
+     - `DATABASE_URL` = (Supabase 연결 문자열)
+     - `JWT_SECRET` = (강력한 랜덤 문자열, 32자 이상)
+     - `JWT_EXPIRES_IN` = `7d`
+     - `CORS_ORIGIN` = (Vercel 프론트엔드 URL, 예: `https://your-frontend.vercel.app`)
 
-4. **시작 명령어 설정**
-   - Start Command: `npm start`
+4. **Create Web Service** 클릭
 
 5. **Prisma 마이그레이션**
-   - Railway 터미널에서:
+   - 배포 완료 후 Render 대시보드 → **Shell** 탭
+   - 다음 명령어 실행:
    ```bash
-   npm run prisma:generate
    npx prisma migrate deploy
    ```
 
+**자세한 내용은 [`RENDER_DEPLOY.md`](./RENDER_DEPLOY.md) 파일을 참고하세요.**
+
 ---
 
-### 옵션 2: Netlify (프론트엔드) + Heroku (백엔드)
+### 기타 옵션 (참고용)
+
+#### 옵션 2: Netlify (프론트엔드) + Render (백엔드)
 
 #### 프론트엔드 (Netlify)
 
@@ -256,13 +272,17 @@ CORS_ORIGIN="https://your-frontend-domain.com"
 
 2. **프로젝트 배포**
    - Sites → Add new site → Deploy manually
-   - `캘린더프론트엔드/dist` 폴더 드래그 앤 드롭
+   - `frontend/dist` 폴더 드래그 앤 드롭
 
 3. **환경 변수 설정**
    - Site settings → Environment variables
    - `VITE_API_BASE_URL` 추가
 
-#### 백엔드 (Heroku)
+#### 백엔드 (Render)
+
+**참고**: Render 사용 방법은 위의 "권장 구성" 섹션을 참고하세요.
+
+#### 기타 백엔드 옵션 (Heroku 예시)
 
 1. **Heroku 계정 생성**
    - [Heroku](https://heroku.com) 접속 및 가입
@@ -274,7 +294,7 @@ CORS_ORIGIN="https://your-frontend-domain.com"
 
 3. **프로젝트 배포**
    ```bash
-   cd 캘린더백엔드
+   cd backend
    heroku create your-app-name
    git init
    git add .
@@ -325,13 +345,13 @@ CORS_ORIGIN="https://your-frontend-domain.com"
    cd open-calendar-app
    
    # 또는 SCP로 파일 업로드
-   scp -r ./캘린더프론트엔드 user@server:/var/www/
-   scp -r ./캘린더백엔드 user@server:/var/www/
+   scp -r ./frontend user@server:/var/www/
+   scp -r ./backend user@server:/var/www/
    ```
 
 3. **프론트엔드 빌드 및 배포**
    ```bash
-   cd /var/www/캘린더프론트엔드
+   cd /var/www/frontend
    npm install
    npm run build
    
@@ -341,7 +361,7 @@ CORS_ORIGIN="https://your-frontend-domain.com"
 
 4. **백엔드 배포**
    ```bash
-   cd /var/www/캘린더백엔드
+   cd /var/www/backend
    npm install --production
    npm run prisma:generate
    npx prisma migrate deploy
@@ -483,8 +503,13 @@ CORS_ORIGIN="https://your-frontend-domain.com"
 
 ## 💡 추천 배포 구성
 
-### 무료 옵션 (개인 프로젝트/소규모)
+### ⭐ 본 프로젝트 배포 구성 (권장)
 - **프론트엔드**: Vercel (무료)
+- **백엔드**: Render (무료 티어)
+- **데이터베이스**: Supabase (무료)
+
+### 기타 무료 옵션 (참고용)
+- **프론트엔드**: Vercel (무료) 또는 Netlify (무료)
 - **백엔드**: Railway (무료 티어) 또는 Render (무료 티어)
 - **데이터베이스**: Supabase (무료)
 
