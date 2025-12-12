@@ -7,6 +7,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 10000, // 10초 타임아웃 추가
 })
 
 // 요청 인터셉터: 토큰 추가
@@ -37,9 +38,16 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // 인증 실패 시 로그아웃
-      localStorage.removeItem('auth-storage')
-      window.location.href = '/login'
+      // 로그인 API(/auth/login)의 401 응답은 인터셉터에서 처리하지 않음
+      // 로그인 페이지에서 직접 에러 메시지를 표시해야 함
+      const isLoginEndpoint = error.config?.url?.includes('/auth/login')
+      const isLoginPage = window.location.pathname === '/login'
+      
+      // 로그인 API가 아니고, 이미 로그인 페이지가 아닐 때만 리다이렉트
+      if (!isLoginEndpoint && !isLoginPage) {
+        localStorage.removeItem('auth-storage')
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }

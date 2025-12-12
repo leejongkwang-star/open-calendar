@@ -189,13 +189,16 @@ router.post(
 
       const { employeeNumber, password } = req.body
 
-      // 사용자 조회
-      const user = await prisma.user.findUnique({
+      // 사용자 조회 (Supabase Pooler 모드 호환성을 위해 findFirst 사용)
+      const user = await prisma.user.findFirst({
         where: { employeeNumber: employeeNumber.toUpperCase() },
       })
 
       if (!user) {
-        return res.status(401).json({ message: '직원번호 또는 비밀번호가 올바르지 않습니다.' })
+        return res.status(401).json({ 
+          message: '등록된 직원번호가 없습니다. 회원가입을 진행해주세요.',
+          code: 'USER_NOT_FOUND'
+        })
       }
 
       // 비밀번호 확인

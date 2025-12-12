@@ -31,17 +31,30 @@ function LoginPage() {
       // 백엔드에서 반환한 구체적인 메시지를 우선 표시
       let errorMessage = '로그인에 실패했습니다. 직원번호와 비밀번호를 확인해주세요.'
       
-      if (err.response?.status === 403) {
+      // 타임아웃 또는 네트워크 오류 확인
+      if (err.code === 'ECONNABORTED' || err.message === 'timeout of 10000ms exceeded') {
+        errorMessage = '서버 응답 시간이 초과되었습니다. 네트워크 연결을 확인하거나 잠시 후 다시 시도해주세요.'
+      } else if (!err.response) {
+        // 네트워크 오류 (서버에 연결할 수 없음)
+        errorMessage = '서버에 연결할 수 없습니다. 백엔드 서버가 실행 중인지 확인해주세요.'
+      } else if (err.response?.status === 403) {
         // 403 오류: 승인 대기, 거부 등 상태별 메시지
         errorMessage = err.response?.data?.message || '접근이 거부되었습니다. 관리자에게 문의하세요.'
       } else if (err.response?.status === 401) {
         // 401 오류: 인증 실패
-        errorMessage = err.response?.data?.message || '직원번호 또는 비밀번호가 올바르지 않습니다.'
+        const backendMessage = err.response?.data?.message || '직원번호 또는 비밀번호가 올바르지 않습니다.'
+        
+        // 사용자가 없을 때 회원가입 안내
+        if (err.response?.data?.code === 'USER_NOT_FOUND' || backendMessage.includes('등록된 직원번호가 없습니다')) {
+          errorMessage = '등록된 직원번호가 없습니다. 회원가입을 진행해주세요.'
+        } else {
+          errorMessage = backendMessage
+        }
       } else if (err.response?.data?.message) {
         // 기타 응답 에러 메시지
         errorMessage = err.response.data.message
       } else if (err.message) {
-        // 네트워크 오류 등
+        // 기타 오류
         errorMessage = err.message
       }
       
