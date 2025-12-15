@@ -26,11 +26,21 @@ function LoginPage() {
       const response = await authAPI.login(employeeNumber, password)
       
       login(response.user, response.token)
-      // 로그인 성공 시: 현재 히스토리 엔트리(로그인 페이지)를 캘린더로 교체
-      // replace: true를 사용하면 로그인 페이지가 히스토리에서 제거되고
-      // 뒤로가기를 눌러도 로그인 페이지 이전의 페이지(있을 경우)로 가거나
-      // 히스토리가 비어있으면 현재 페이지(캘린더)를 유지합니다
+      
+      // 로그인 성공: 현재 히스토리 엔트리(로그인 페이지)를 캘린더로 교체
       navigate('/calendar', { replace: true })
+      
+      // 로그인 유지 상태로 로그인한 경우: 히스토리에 여러 개의 캘린더 엔트리를 추가
+      // 이렇게 하면 뒤로가기를 여러 번 눌러도 계속 캘린더 페이지에 머물 수 있음
+      if (rememberMe) {
+        // React Router의 navigate가 완료된 후 히스토리에 추가 엔트리를 넣음
+        setTimeout(() => {
+          // 현재 히스토리 상태를 확인하고, 캘린더 페이지를 여러 번 추가
+          // 뒤로가기를 눌렀을 때도 캘린더에 머물도록 함
+          window.history.pushState({ view: 'month', previousView: null, preventLogin: true }, '', '/calendar')
+          window.history.pushState({ view: 'month', previousView: null, preventLogin: true }, '', '/calendar')
+        }, 100)
+      }
     } catch (err) {
       // 백엔드에서 반환한 구체적인 메시지를 우선 표시
       let errorMessage = '로그인에 실패했습니다. 직원번호와 비밀번호를 확인해주세요.'

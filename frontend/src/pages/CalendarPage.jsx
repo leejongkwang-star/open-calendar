@@ -439,6 +439,21 @@ function CalendarPage() {
         return
       }
 
+      // 현재 경로 확인 (popstate 이벤트 후 경로가 변경됨)
+      const currentPath = window.location.pathname
+      
+      // 로그인 페이지로 가려고 하는 경우 막기 (로그인 유지 상태 유지)
+      if (currentPath === '/login' || currentPath === '/login/') {
+        // 로그인 페이지로 가려고 하면 다시 캘린더로 돌아가기
+        isHandlingBackRef.current = true
+        window.history.pushState({ view: view, previousView: previousViewRef.current, preventLogin: true }, '', '/calendar')
+        // 경로가 변경되었으므로 페이지를 다시 렌더링하지 않도록 함
+        setTimeout(() => {
+          isHandlingBackRef.current = false
+        }, 100)
+        return
+      }
+
       if (event.state && event.state.previousView) {
         // 히스토리 상태에서 이전 뷰로 복귀
         isHandlingBackRef.current = true
@@ -447,10 +462,15 @@ function CalendarPage() {
         if (event.state.view) {
           previousViewRef.current = event.state.view
         }
-      } else {
-        // 히스토리 상태가 없을 때는 아무것도 하지 않음
-        // (브라우저 기본 뒤로가기 동작 허용 - 로그인 유지 상태에서는 현재 페이지 유지)
-        // 로그아웃 상태에서는 App.jsx의 PrivateRoute가 로그인 페이지로 리다이렉트
+      } else if (!event.state || !event.state.preventLogin) {
+        // 히스토리 상태가 없을 때는 현재 페이지를 유지하기 위해 히스토리에 다시 추가
+        // 이렇게 하면 여러 번 뒤로가기를 눌러도 현재 페이지를 유지
+        // preventLogin 플래그가 있으면 무한 루프 방지를 위해 추가하지 않음
+        isHandlingBackRef.current = true
+        window.history.pushState({ view: view, previousView: null }, '', window.location.pathname)
+        setTimeout(() => {
+          isHandlingBackRef.current = false
+        }, 100)
       }
     }
 
