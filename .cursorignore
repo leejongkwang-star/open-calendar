@@ -1,0 +1,10 @@
+node_modules/
+# 빌드 폴더
+dist/
+build/
+.next/
+out/
+*.log
+*.map
+package-lock.json
+yarn.lock
