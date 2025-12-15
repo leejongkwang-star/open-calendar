@@ -236,7 +236,11 @@ function EventPopup({ event, position, onClose, onEdit, onDelete, onMessage }) {
                 gap: '6px',
               }}
             >
-              <span>{formatDate(event.start)}</span>
+              {event.end && event.start && new Date(event.start).toDateString() !== new Date(event.end).toDateString() ? (
+                <span>{formatDate(event.start)} ~ {formatDate(event.end)}</span>
+              ) : (
+                <span>{formatDate(event.start)}</span>
+              )}
             </div>
 
             {/* 참석자/생성자 */}
