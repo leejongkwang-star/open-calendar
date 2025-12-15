@@ -26,7 +26,7 @@ function LoginPage() {
       const response = await authAPI.login(employeeNumber, password)
       
       login(response.user, response.token)
-      navigate('/calendar')
+      navigate('/calendar', { replace: true })
     } catch (err) {
       // 백엔드에서 반환한 구체적인 메시지를 우선 표시
       let errorMessage = '로그인에 실패했습니다. 직원번호와 비밀번호를 확인해주세요.'
