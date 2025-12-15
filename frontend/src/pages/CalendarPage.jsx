@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { Calendar, momentLocalizer } from 'react-big-calendar'
 import moment from 'moment'
 import 'moment/locale/ko'
@@ -33,6 +33,8 @@ function CalendarPage() {
     members: [],
     eventTypes: ['VACATION', 'MEETING', 'TRAINING', 'BUSINESS_TRIP', 'OTHER'],
   })
+  const previousViewRef = useRef('month')
+  const isHandlingBackRef = useRef(false)
 
   // 필터링된 이벤트
   const filteredEvents = useMemo(() => {
@@ -148,7 +150,7 @@ function CalendarPage() {
       if (hasMyEventsOnDate) {
         // 본인의 일정이 있으면 일뷰로 이동
         setSelectedDate(start)
-        setView('day')
+        handleViewChange('day')
       } else {
         // 본인의 일정이 없으면 일정 등록 모달 열기
         setSelectedEvent({ start, end })
@@ -367,7 +369,57 @@ function CalendarPage() {
     if (teams.length > 0) {
       loadEvents()
     }
-  }, [teams, loadEvents]) // loadEvents 의존성 추가
+  }, [teams, loadEvents])
+
+  // 뷰 변경 핸들러: 모든 뷰 변경 시 히스토리에 추가
+  const handleViewChange = useCallback((newView) => {
+    if (isHandlingBackRef.current) {
+      // 뒤로가기로 인한 뷰 변경은 히스토리 추가하지 않음
+      isHandlingBackRef.current = false
+      setView(newView)
+      return
+    }
+
+    const currentView = view
+    if (currentView !== newView) {
+      // 이전 뷰 저장
+      previousViewRef.current = currentView
+      // 히스토리에 추가
+      window.history.pushState({ view: newView, previousView: currentView }, '', window.location.pathname)
+      setView(newView)
+    }
+  }, [view])
+
+  // 뒤로가기 처리: 모든 뷰에서 이전 뷰로 복귀
+  useEffect(() => {
+    const handlePopState = (event) => {
+      if (isHandlingBackRef.current) {
+        return
+      }
+
+      if (event.state && event.state.previousView) {
+        // 히스토리 상태에서 이전 뷰로 복귀
+        isHandlingBackRef.current = true
+        setView(event.state.previousView)
+        // 복귀한 뷰를 새로운 previousView로 업데이트
+        if (event.state.view) {
+          previousViewRef.current = event.state.view
+        }
+      } else {
+        // 히스토리 상태가 없으면 이전 뷰로 복귀
+        if (previousViewRef.current && previousViewRef.current !== view) {
+          isHandlingBackRef.current = true
+          setView(previousViewRef.current)
+        }
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [view])
 
   // 뷰나 날짜가 변경되면 해당 기간의 일정만 다시 조회
   useEffect(() => {
@@ -854,7 +906,7 @@ function CalendarPage() {
           endAccessor="end"
           style={{ height: '100%', minHeight: '650px' }}
           view={view}
-          onView={setView}
+          onView={handleViewChange}
           date={selectedDate}
           onNavigate={setSelectedDate}
           onSelectEvent={handleSelectEvent}
