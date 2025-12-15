@@ -441,23 +441,54 @@ router.post(
         return res.status(409).json({ message: '이미 팀에 속한 구성원입니다.' })
       }
 
-      const member = await prisma.teamMember.create({
-        data: {
-          teamId: parseInt(teamId),
-          userId: finalUserId,
-          position,
-          phone,
-          role: role || 'MEMBER',
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              employeeNumber: true,
-              name: true,
+      // 최종 역할 결정: 요청 값이 있으면 우선, 없으면 사용자 전역 역할, 둘 다 없으면 MEMBER
+      const targetRole = role || (user && user.role) || 'MEMBER'
+
+      // 트랜잭션: 팀 구성원 생성 + (필요 시) 사용자 및 다른 팀 권한 동기화
+      const member = await prisma.$transaction(async (tx) => {
+        // 사용자 전역 역할과 다른 역할로 추가하려는 경우, 전역 역할 및 다른 팀 권한도 함께 변경
+        if (user && targetRole && user.role !== targetRole) {
+          // 전역 관리자 최소 1명 유지 (ADMIN → MEMBER 강등 시)
+          if (user.role === 'ADMIN' && targetRole === 'MEMBER') {
+            const adminCount = await tx.user.count({
+              where: { role: 'ADMIN', status: 'APPROVED' },
+            })
+            if (adminCount <= 1) {
+              throw new Error('최소 1명의 전역 관리자가 필요합니다. 마지막 관리자는 일반으로 변경할 수 없습니다.')
+            }
+          }
+
+          await tx.user.update({
+            where: { id: finalUserId },
+            data: { role: targetRole },
+          })
+
+          await tx.teamMember.updateMany({
+            where: { userId: finalUserId },
+            data: { role: targetRole },
+          })
+        }
+
+        const createdMember = await tx.teamMember.create({
+          data: {
+            teamId: parseInt(teamId),
+            userId: finalUserId,
+            position,
+            phone,
+            role: targetRole,
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                employeeNumber: true,
+                name: true,
+              },
             },
           },
-        },
+        })
+
+        return createdMember
       })
 
       res.status(201).json({
@@ -521,18 +552,46 @@ router.put(
       if (phone !== undefined) updateData.phone = phone
       if (role) updateData.role = role
 
-      const updatedMember = await prisma.teamMember.update({
-        where: { id: parseInt(memberId) },
-        data: updateData,
-        include: {
-          user: {
-            select: {
-              id: true,
-              employeeNumber: true,
-              name: true,
+      const updatedMember = await prisma.$transaction(async (tx) => {
+        const memberForUpdate = await tx.teamMember.update({
+          where: { id: parseInt(memberId) },
+          data: updateData,
+          include: {
+            user: {
+              select: {
+                id: true,
+                employeeNumber: true,
+                name: true,
+                role: true,
+              },
             },
           },
-        },
+        })
+
+        // role이 변경된 경우: 사용자 전역 역할 및 다른 팀 권한도 동기화
+        if (role && memberForUpdate.user && memberForUpdate.user.role !== role) {
+          // 전역 관리자 최소 1명 유지 (ADMIN → MEMBER 강등 시)
+          if (memberForUpdate.user.role === 'ADMIN' && role === 'MEMBER') {
+            const adminCount = await tx.user.count({
+              where: { role: 'ADMIN', status: 'APPROVED' },
+            })
+            if (adminCount <= 1) {
+              throw new Error('최소 1명의 전역 관리자가 필요합니다. 마지막 관리자는 일반으로 변경할 수 없습니다.')
+            }
+          }
+
+          await tx.user.update({
+            where: { id: memberForUpdate.user.id },
+            data: { role },
+          })
+
+          await tx.teamMember.updateMany({
+            where: { userId: memberForUpdate.user.id },
+            data: { role },
+          })
+        }
+
+        return memberForUpdate
       })
 
       res.json({
@@ -608,6 +667,7 @@ router.patch(
               id: true,
               employeeNumber: true,
               name: true,
+              role: true,
             },
           },
         },
@@ -617,7 +677,7 @@ router.patch(
         return res.status(404).json({ message: '구성원을 찾을 수 없습니다.' })
       }
 
-      // 최소 1명의 관리자 유지 확인
+      // 팀 내 최소 1명의 관리자 유지 확인
       if (member.role === 'ADMIN' && role === 'MEMBER') {
         const adminCount = await prisma.teamMember.count({
           where: {
@@ -631,18 +691,44 @@ router.patch(
         }
       }
 
-      const updatedMember = await prisma.teamMember.update({
-        where: { id: parseInt(memberId) },
-        data: { role },
-        include: {
-          user: {
-            select: {
-              id: true,
-              employeeNumber: true,
-              name: true,
+      const updatedMember = await prisma.$transaction(async (tx) => {
+        // 전역 관리자 최소 1명 유지 (전역 ADMIN → MEMBER 강등 시)
+        if (member.user.role === 'ADMIN' && role === 'MEMBER') {
+          const globalAdminCount = await tx.user.count({
+            where: { role: 'ADMIN', status: 'APPROVED' },
+          })
+          if (globalAdminCount <= 1) {
+            throw new Error('최소 1명의 전역 관리자가 필요합니다. 마지막 관리자는 일반으로 변경할 수 없습니다.')
+          }
+        }
+
+        const memberForUpdate = await tx.teamMember.update({
+          where: { id: parseInt(memberId) },
+          data: { role },
+          include: {
+            user: {
+              select: {
+                id: true,
+                employeeNumber: true,
+                name: true,
+                role: true,
+              },
             },
           },
-        },
+        })
+
+        // 사용자 전역 역할 및 다른 팀 권한도 새 role로 동기화
+        await tx.user.update({
+          where: { id: memberForUpdate.user.id },
+          data: { role },
+        })
+
+        await tx.teamMember.updateMany({
+          where: { userId: memberForUpdate.user.id },
+          data: { role },
+        })
+
+        return memberForUpdate
       })
 
       res.json({
