@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { Calendar, momentLocalizer } from 'react-big-calendar'
+import { useLocation, useNavigate } from 'react-router-dom'
 import moment from 'moment'
 import 'moment/locale/ko'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
@@ -17,7 +18,9 @@ moment.locale('ko')
 const localizer = momentLocalizer(moment)
 
 function CalendarPage() {
-  const { user } = useAuthStore()
+  const { user, isAuthenticated } = useAuthStore()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [events, setEvents] = useState([])
   const [teams, setTeams] = useState([])
   const [selectedTeamId, setSelectedTeamId] = useState(null)
@@ -361,17 +364,35 @@ function CalendarPage() {
     }
   }, [])
 
+  // 로그인 유지 상태에서 로그인 페이지로 가는 것을 완전히 차단
+  useEffect(() => {
+    // 현재 경로가 로그인 페이지인 경우 즉시 캘린더로 리다이렉트
+    if ((location.pathname === '/login' || location.pathname === '/login/') && isAuthenticated) {
+      navigate('/calendar', { replace: true })
+    }
+  }, [location.pathname, isAuthenticated, navigate])
+
   // 초기 로드 시 히스토리 초기화: 로그인 유지 상태에서 뒤로가기 시 로그인 페이지로 돌아가지 않도록
   useEffect(() => {
     if (isInitialLoadRef.current) {
       // 첫 로드 시, 히스토리에 현재 상태(월뷰)를 추가하여 뒤로가기가 현재 페이지를 유지하도록 함
       // 이미 히스토리에 상태가 있다면 추가하지 않음 (뷰 변경 등으로 인해 상태가 이미 있는 경우)
       if (!window.history.state || !window.history.state.view) {
-        window.history.replaceState({ view: 'month', previousView: null }, '', window.location.pathname)
+        window.history.replaceState({ view: 'month', previousView: null, preventLogin: true }, '', window.location.pathname)
+      }
+      // 로그인 유지 상태인 경우, 히스토리에 충분한 캘린더 엔트리를 추가
+      // 이렇게 하면 뒤로가기를 여러 번 눌러도 로그인 페이지로 돌아가지 않음
+      if (isAuthenticated) {
+        setTimeout(() => {
+          // 최소 10개의 캘린더 엔트리를 추가하여 뒤로가기를 여러 번 눌러도 캘린더에 머물 수 있도록 함
+          for (let i = 0; i < 10; i++) {
+            window.history.pushState({ view: 'month', previousView: null, preventLogin: true }, '', '/calendar')
+          }
+        }, 100)
       }
       isInitialLoadRef.current = false
     }
-  }, [])
+  }, [isAuthenticated])
 
   useEffect(() => {
     loadTeams()
@@ -443,14 +464,16 @@ function CalendarPage() {
       const currentPath = window.location.pathname
       
       // 로그인 페이지로 가려고 하는 경우 막기 (로그인 유지 상태 유지)
-      if (currentPath === '/login' || currentPath === '/login/') {
-        // 로그인 페이지로 가려고 하면 다시 캘린더로 돌아가기
+      if ((currentPath === '/login' || currentPath === '/login/') && isAuthenticated) {
+        // 로그인 페이지로 가려고 하면 즉시 캘린더로 돌아가기
         isHandlingBackRef.current = true
-        window.history.pushState({ view: view, previousView: previousViewRef.current, preventLogin: true }, '', '/calendar')
-        // 경로가 변경되었으므로 페이지를 다시 렌더링하지 않도록 함
+        // navigate를 사용하여 React Router도 업데이트
+        navigate('/calendar', { replace: true })
+        // 히스토리에 추가 엔트리를 넣어서 다시 뒤로가기를 눌러도 캘린더에 머물도록 함
         setTimeout(() => {
+          window.history.pushState({ view: view, previousView: previousViewRef.current, preventLogin: true }, '', '/calendar')
           isHandlingBackRef.current = false
-        }, 100)
+        }, 50)
         return
       }
 
@@ -479,7 +502,7 @@ function CalendarPage() {
     return () => {
       window.removeEventListener('popstate', handlePopState)
     }
-  }, [view, showEventModal, handleCloseModal])
+  }, [view, showEventModal, handleCloseModal, isAuthenticated, navigate])
 
   // 뷰나 날짜가 변경되면 해당 기간의 일정만 다시 조회
   useEffect(() => {
