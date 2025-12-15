@@ -1,0 +1,56 @@
+# Google Cloud Build 설정 파일
+# GitHub에서 코드가 푸시되면 자동으로 빌드하고 Cloud Run에 배포합니다
+
+steps:
+  # 1. Docker 이미지 빌드
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'asia-northeast3-docker.pkg.dev/$PROJECT_ID/calendar-backend/calendar-backend:$SHORT_SHA'
+      - '-t'
+      - 'asia-northeast3-docker.pkg.dev/$PROJECT_ID/calendar-backend/calendar-backend:latest'
+      - '.'
+    dir: 'backend'
+
+  # 2. Artifact Registry에 이미지 푸시
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '--all-tags'
+      - 'asia-northeast3-docker.pkg.dev/$PROJECT_ID/calendar-backend/calendar-backend'
+
+  # 3. Cloud Run에 배포
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'calendar-backend'
+      - '--image'
+      - 'asia-northeast3-docker.pkg.dev/$PROJECT_ID/calendar-backend/calendar-backend:$SHORT_SHA'
+      - '--region'
+      - 'asia-northeast3'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '512Mi'
+      - '--cpu'
+      - '1'
+      - '--timeout'
+      - '300s'
+
+# 이미지 빌드 결과
+images:
+  - 'asia-northeast3-docker.pkg.dev/$PROJECT_ID/calendar-backend/calendar-backend:$SHORT_SHA'
+  - 'asia-northeast3-docker.pkg.dev/$PROJECT_ID/calendar-backend/calendar-backend:latest'
+
+# 빌드 옵션
+options:
+  machineType: 'E2_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+
+# 타임아웃 (10분)
+timeout: 600s
+

@@ -136,8 +136,10 @@ app.use((req, res) => {
 app.use(errorHandler)
 
 // 서버 시작
-const server = app.listen(PORT, () => {
-  console.log(`🚀 서버가 http://localhost:${PORT}에서 실행 중입니다.`)
+// Cloud Run은 0.0.0.0에서 리스닝해야 함
+const HOST = process.env.HOST || '0.0.0.0'
+const server = app.listen(PORT, HOST, () => {
+  console.log(`🚀 서버가 http://${HOST}:${PORT}에서 실행 중입니다.`)
   console.log(`📊 환경: ${process.env.NODE_ENV || 'development'}`)
 })
 
