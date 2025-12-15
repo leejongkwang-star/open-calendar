@@ -237,25 +237,32 @@ function EventPopup({ event, position, onClose, onEdit, onDelete, onMessage }) {
               }}
             >
               {(() => {
-                // 실제 DB의 endDate 또는 originalEndDate 사용 (react-big-calendar용 displayEnd가 아닌)
-                const actualEndDate = event.originalEndDate ? new Date(event.originalEndDate) : (event.endDate ? new Date(event.endDate) : (event.end ? new Date(event.end) : null))
-                const startDate = event.startDate ? new Date(event.startDate) : (event.start ? new Date(event.start) : null)
+                // originalStartDate, originalEndDate는 백엔드 원본 날짜 (UTC 기준 날짜만 추출된 값)
+                // event.end는 react-big-calendar용으로 종료일 다음 날이므로 사용하지 않음
+                const startDate = event.originalStartDate ? new Date(event.originalStartDate) : (event.startDate ? new Date(event.startDate) : (event.start ? new Date(event.start) : null))
+                const actualEndDate = event.originalEndDate ? new Date(event.originalEndDate) : null
                 
                 if (!startDate || !actualEndDate) {
-                  return <span>{formatDate(event.start)}</span>
+                  return <span>{formatDate(event.start || event.startDate)}</span>
                 }
                 
                 // UTC 기준으로 날짜만 비교 (시간 제외)
+                // originalStartDate, originalEndDate는 이미 UTC 기준 날짜만 추출된 값이므로 그대로 사용
                 const startUTCDate = startDate.getUTCFullYear() * 10000 + (startDate.getUTCMonth() + 1) * 100 + startDate.getUTCDate()
                 const endUTCDate = actualEndDate.getUTCFullYear() * 10000 + (actualEndDate.getUTCMonth() + 1) * 100 + actualEndDate.getUTCDate()
                 const isSameDay = startUTCDate === endUTCDate
                 
+                // 표시용 날짜는 로컬 시간 기준으로 포맷팅
+                // UTC 날짜를 로컬 시간으로 변환하여 표시
+                const displayStartDate = new Date(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate())
+                const displayEndDate = new Date(actualEndDate.getUTCFullYear(), actualEndDate.getUTCMonth(), actualEndDate.getUTCDate())
+                
                 if (isSameDay) {
                   // 하루짜리 일정: 시작일만 표시
-                  return <span>{formatDate(startDate)}</span>
+                  return <span>{formatDate(displayStartDate)}</span>
                 } else {
                   // 여러 날짜 일정: 시작일 ~ 종료일 표시
-                  return <span>{formatDate(startDate)} ~ {formatDate(actualEndDate)}</span>
+                  return <span>{formatDate(displayStartDate)} ~ {formatDate(displayEndDate)}</span>
                 }
               })()}
             </div>

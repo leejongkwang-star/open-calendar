@@ -288,8 +288,22 @@ function CalendarPage() {
               return null
             }
             
-            // 원본 endDate 저장 (수정 모달에서 사용)
-            const originalEndDate = event.endDate ? new Date(event.endDate) : new Date(end)
+            // 백엔드에서 받은 원본 startDate, endDate를 UTC 기준 날짜만 추출하여 저장
+            // 이렇게 하면 시간대 변환으로 인한 날짜 오차를 방지할 수 있음
+            const backendStartDate = event.startDate ? new Date(event.startDate) : new Date(start)
+            const backendEndDate = event.endDate ? new Date(event.endDate) : new Date(end)
+            
+            // UTC 기준으로 날짜만 추출 (시간은 00:00:00으로 설정)
+            const originalStartDate = new Date(Date.UTC(
+              backendStartDate.getUTCFullYear(),
+              backendStartDate.getUTCMonth(),
+              backendStartDate.getUTCDate()
+            ))
+            const originalEndDate = new Date(Date.UTC(
+              backendEndDate.getUTCFullYear(),
+              backendEndDate.getUTCMonth(),
+              backendEndDate.getUTCDate()
+            ))
             
             // UTC 기준으로 날짜 비교 (하루짜리 일정 확인)
             const startUTCDate = start.getUTCFullYear() * 10000 + (start.getUTCMonth() + 1) * 100 + start.getUTCDate()
@@ -317,11 +331,12 @@ function CalendarPage() {
             
             return {
               ...event,
-              startDate: startLocal, // 원본 startDate 저장 (로컬 시간)
-              endDate: endLocal, // 원본 endDate 저장 (로컬 시간)
+              startDate: startLocal, // 원본 startDate 저장 (로컬 시간, 캘린더 표시용)
+              endDate: endLocal, // 원본 endDate 저장 (로컬 시간, 캘린더 표시용)
               start: startLocal, // 캘린더 표시용 start (로컬 시간)
               end: displayEnd, // 캘린더 표시용 end (로컬 시간)
-              originalEndDate: originalEndDate, // 원본 종료일 (수정 모달용)
+              originalStartDate: originalStartDate, // 원본 시작일 (UTC 기준 날짜만, 팝업 표시용)
+              originalEndDate: originalEndDate, // 원본 종료일 (UTC 기준 날짜만, 팝업 표시용)
             }
           } catch (error) {
             if (import.meta.env.DEV) {
