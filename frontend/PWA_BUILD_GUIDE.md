@@ -108,3 +108,4 @@ npm install -D vite-plugin-pwa
 - 수동으로 만든 `manifest.json`이나 `sw.js`는 충돌을 일으킬 수 있습니다
 - 로컬 개발 시 `npm run dev`는 PWA 기능이 완전히 작동하지 않을 수 있으므로, `npm run build && npm run preview`로 테스트하세요
 
+

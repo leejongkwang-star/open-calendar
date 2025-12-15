@@ -532,6 +532,14 @@ router.put(
           },
         })
 
+        // 역할이 변경된 경우: 해당 사용자의 모든 팀 구성원 역할도 동일하게 동기화
+        if (role && role !== user.role) {
+          await tx.teamMember.updateMany({
+            where: { userId: parseInt(userId) },
+            data: { role },
+          })
+        }
+
         // 팀 ID가 제공된 경우 팀 멤버 정보 업데이트
         if (teamId !== undefined) {
           // 팀 존재 확인
