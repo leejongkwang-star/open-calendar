@@ -35,6 +35,7 @@ function CalendarPage() {
   })
   const previousViewRef = useRef('month')
   const isHandlingBackRef = useRef(false)
+  const modalHistoryRef = useRef(null) // 모달 열림 상태 추적
 
   // 필터링된 이벤트
   const filteredEvents = useMemo(() => {
@@ -108,7 +109,7 @@ function CalendarPage() {
     } else {
       // 일/주 뷰에서는 기존 모달 표시
       setSelectedEvent(event)
-      setShowEventModal(true)
+      handleOpenModal()
     }
   }
 
@@ -123,7 +124,7 @@ function CalendarPage() {
       if (!user?.id) {
         // user가 없으면 일정 등록 모달 열기
         setSelectedEvent({ start, end })
-        setShowEventModal(true)
+        handleOpenModal()
         return
       }
       
@@ -154,12 +155,12 @@ function CalendarPage() {
       } else {
         // 본인의 일정이 없으면 일정 등록 모달 열기
         setSelectedEvent({ start, end })
-        setShowEventModal(true)
+        handleOpenModal()
       }
     } else {
       // 일/주 뷰에서는 기존 동작 (일정 등록 모달)
       setSelectedEvent({ start, end })
-      setShowEventModal(true)
+      handleOpenModal()
     }
   }
 
@@ -167,7 +168,7 @@ function CalendarPage() {
   const handlePopupEdit = () => {
     setSelectedEvent(popupEvent)
     setShowEventPopup(false)
-    setShowEventModal(true)
+    handleOpenModal()
   }
 
   // 팝업에서 삭제 클릭
@@ -390,10 +391,38 @@ function CalendarPage() {
     }
   }, [view])
 
-  // 뒤로가기 처리: 모든 뷰에서 이전 뷰로 복귀
+  // 모달 열기 핸들러: 모달 열 때 히스토리 추가
+  const handleOpenModal = useCallback(() => {
+    if (!modalHistoryRef.current) {
+      // 모달을 열 때 히스토리에 추가
+      modalHistoryRef.current = true
+      window.history.pushState({ modal: 'eventModal' }, '', window.location.pathname)
+    }
+    setShowEventModal(true)
+  }, [])
+
+  // 모달 닫기 핸들러: 모달 닫을 때 히스토리 상태 정리
+  const handleCloseModal = useCallback(() => {
+    setShowEventModal(false)
+    setSelectedEvent(null)
+    modalHistoryRef.current = false
+  }, [])
+
+  // 뒤로가기 처리: 모든 뷰와 모달에서 이전 상태로 복귀
   useEffect(() => {
     const handlePopState = (event) => {
       if (isHandlingBackRef.current) {
+        return
+      }
+
+      // 모달이 열려있으면 모달 닫기
+      if (showEventModal) {
+        isHandlingBackRef.current = true
+        handleCloseModal()
+        // 모달 닫은 후에는 다른 뒤로가기 처리하지 않음
+        setTimeout(() => {
+          isHandlingBackRef.current = false
+        }, 100)
         return
       }
 
@@ -419,7 +448,7 @@ function CalendarPage() {
     return () => {
       window.removeEventListener('popstate', handlePopState)
     }
-  }, [view])
+  }, [view, showEventModal, handleCloseModal])
 
   // 뷰나 날짜가 변경되면 해당 기간의 일정만 다시 조회
   useEffect(() => {
@@ -634,8 +663,7 @@ function CalendarPage() {
       
       // 이벤트 목록 새로고침
       loadEvents()
-      setShowEventModal(false)
-      setSelectedEvent(null)
+      handleCloseModal()
     } catch (error) {
       if (import.meta.env.DEV) {
         console.error('이벤트 저장 실패:', error)
@@ -651,7 +679,7 @@ function CalendarPage() {
       }
       // 403 오류는 권한 부족이므로 에러 메시지만 표시하고 모달은 유지
     }
-  }, [selectedEvent, selectedTeamId, user, loadEvents])
+  }, [selectedEvent, selectedTeamId, user, loadEvents, handleCloseModal])
 
   // 이벤트 삭제 핸들러
   const handleDeleteEvent = useCallback(async (eventId) => {
@@ -661,8 +689,7 @@ function CalendarPage() {
       await eventsAPI.deleteEvent(eventId)
       
       loadEvents()
-      setShowEventModal(false)
-      setSelectedEvent(null)
+      handleCloseModal()
     } catch (error) {
       if (import.meta.env.DEV) {
         console.error('이벤트 삭제 실패:', error)
@@ -677,7 +704,7 @@ function CalendarPage() {
         }, 2000)
       }
     }
-  }, [loadEvents])
+  }, [loadEvents, handleCloseModal])
 
   // 이벤트 스타일 - 가시성 개선
   const eventStyleGetter = (event) => {
@@ -854,7 +881,7 @@ function CalendarPage() {
           <button
             onClick={() => {
               setSelectedEvent(null)
-              setShowEventModal(true)
+              handleOpenModal()
             }}
             className="btn-primary flex items-center"
           >
@@ -949,10 +976,7 @@ function CalendarPage() {
       {showEventModal && (
         <EventModal
           event={selectedEvent}
-          onClose={() => {
-            setShowEventModal(false)
-            setSelectedEvent(null)
-          }}
+          onClose={handleCloseModal}
           onSave={handleSaveEvent}
           onDelete={handleDeleteEvent}
           currentUser={user}
