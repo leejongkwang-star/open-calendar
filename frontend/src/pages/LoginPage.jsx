@@ -26,6 +26,10 @@ function LoginPage() {
       const response = await authAPI.login(employeeNumber, password)
       
       login(response.user, response.token)
+      // 로그인 성공 시: 현재 히스토리 엔트리(로그인 페이지)를 캘린더로 교체
+      // replace: true를 사용하면 로그인 페이지가 히스토리에서 제거되고
+      // 뒤로가기를 눌러도 로그인 페이지 이전의 페이지(있을 경우)로 가거나
+      // 히스토리가 비어있으면 현재 페이지(캘린더)를 유지합니다
       navigate('/calendar', { replace: true })
     } catch (err) {
       // 백엔드에서 반환한 구체적인 메시지를 우선 표시

@@ -36,6 +36,7 @@ function CalendarPage() {
   const previousViewRef = useRef('month')
   const isHandlingBackRef = useRef(false)
   const modalHistoryRef = useRef(null) // 모달 열림 상태 추적
+  const isInitialLoadRef = useRef(true) // 초기 로드 여부 추적
 
   // 필터링된 이벤트
   const filteredEvents = useMemo(() => {
@@ -357,6 +358,18 @@ function CalendarPage() {
       if (import.meta.env.DEV) {
         console.error('팀 로드 실패:', error)
       }
+    }
+  }, [])
+
+  // 초기 로드 시 히스토리 초기화: 로그인 유지 상태에서 뒤로가기 시 로그인 페이지로 돌아가지 않도록
+  useEffect(() => {
+    if (isInitialLoadRef.current) {
+      // 첫 로드 시, 히스토리에 현재 상태(월뷰)를 추가하여 뒤로가기가 현재 페이지를 유지하도록 함
+      // 이미 히스토리에 상태가 있다면 추가하지 않음 (뷰 변경 등으로 인해 상태가 이미 있는 경우)
+      if (!window.history.state || !window.history.state.view) {
+        window.history.replaceState({ view: 'month', previousView: null }, '', window.location.pathname)
+      }
+      isInitialLoadRef.current = false
     }
   }, [])
 
