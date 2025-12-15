@@ -435,11 +435,9 @@ function CalendarPage() {
           previousViewRef.current = event.state.view
         }
       } else {
-        // 히스토리 상태가 없으면 이전 뷰로 복귀
-        if (previousViewRef.current && previousViewRef.current !== view) {
-          isHandlingBackRef.current = true
-          setView(previousViewRef.current)
-        }
+        // 히스토리 상태가 없을 때는 아무것도 하지 않음
+        // (브라우저 기본 뒤로가기 동작 허용 - 로그인 유지 상태에서는 현재 페이지 유지)
+        // 로그아웃 상태에서는 App.jsx의 PrivateRoute가 로그인 페이지로 리다이렉트
       }
     }
 

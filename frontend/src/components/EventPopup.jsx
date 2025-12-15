@@ -236,11 +236,28 @@ function EventPopup({ event, position, onClose, onEdit, onDelete, onMessage }) {
                 gap: '6px',
               }}
             >
-              {event.end && event.start && new Date(event.start).toDateString() !== new Date(event.end).toDateString() ? (
-                <span>{formatDate(event.start)} ~ {formatDate(event.end)}</span>
-              ) : (
-                <span>{formatDate(event.start)}</span>
-              )}
+              {(() => {
+                // 실제 DB의 endDate 또는 originalEndDate 사용 (react-big-calendar용 displayEnd가 아닌)
+                const actualEndDate = event.originalEndDate ? new Date(event.originalEndDate) : (event.endDate ? new Date(event.endDate) : (event.end ? new Date(event.end) : null))
+                const startDate = event.startDate ? new Date(event.startDate) : (event.start ? new Date(event.start) : null)
+                
+                if (!startDate || !actualEndDate) {
+                  return <span>{formatDate(event.start)}</span>
+                }
+                
+                // UTC 기준으로 날짜만 비교 (시간 제외)
+                const startUTCDate = startDate.getUTCFullYear() * 10000 + (startDate.getUTCMonth() + 1) * 100 + startDate.getUTCDate()
+                const endUTCDate = actualEndDate.getUTCFullYear() * 10000 + (actualEndDate.getUTCMonth() + 1) * 100 + actualEndDate.getUTCDate()
+                const isSameDay = startUTCDate === endUTCDate
+                
+                if (isSameDay) {
+                  // 하루짜리 일정: 시작일만 표시
+                  return <span>{formatDate(startDate)}</span>
+                } else {
+                  // 여러 날짜 일정: 시작일 ~ 종료일 표시
+                  return <span>{formatDate(startDate)} ~ {formatDate(actualEndDate)}</span>
+                }
+              })()}
             </div>
 
             {/* 참석자/생성자 */}
