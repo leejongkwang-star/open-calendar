@@ -65,3 +65,4 @@ Write-Host "이제 Cursor를 다시 시작하세요!" -ForegroundColor Yellow
 
 
 
+
