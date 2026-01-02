@@ -35,6 +35,7 @@ function CalendarPage() {
   const [filters, setFilters] = useState({
     members: [],
     eventTypes: ['VACATION', 'MEETING', 'TRAINING', 'BUSINESS_TRIP', 'OTHER'],
+    teams: [], // 빈 배열이면 모든 팀 표시
   })
   const previousViewRef = useRef('month')
   const isHandlingBackRef = useRef(false)
@@ -48,6 +49,10 @@ function CalendarPage() {
         return false
       }
       if (filters.eventTypes.length > 0 && !filters.eventTypes.includes(event.eventType)) {
+        return false
+      }
+      // 팀 필터링: teams 배열이 비어있지 않고, 이벤트의 teamId가 포함되지 않으면 필터링
+      if (filters.teams.length > 0 && event.teamId && !filters.teams.includes(event.teamId)) {
         return false
       }
       return true
@@ -966,6 +971,7 @@ function CalendarPage() {
           filters={filters}
           onFiltersChange={setFilters}
           onClose={() => setShowFilter(false)}
+          teams={teams}
         />
       )}
 

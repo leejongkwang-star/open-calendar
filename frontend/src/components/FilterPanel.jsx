@@ -1,7 +1,7 @@
 import { X } from 'lucide-react'
 import { EVENT_TYPE_OPTIONS, toKoreanEventType } from '../utils/eventTypeMapping'
 
-function FilterPanel({ filters, onFiltersChange, onClose }) {
+function FilterPanel({ filters, onFiltersChange, onClose, teams = [] }) {
   const handleMemberToggle = (memberId) => {
     const newMembers = filters.members.includes(memberId)
       ? filters.members.filter((id) => id !== memberId)
@@ -16,10 +16,18 @@ function FilterPanel({ filters, onFiltersChange, onClose }) {
     onFiltersChange({ ...filters, eventTypes: newTypes })
   }
 
+  const handleTeamToggle = (teamId) => {
+    const newTeams = filters.teams.includes(teamId)
+      ? filters.teams.filter((id) => id !== teamId)
+      : [...filters.teams, teamId]
+    onFiltersChange({ ...filters, teams: newTeams })
+  }
+
   const resetFilters = () => {
     onFiltersChange({
       members: [],
       eventTypes: EVENT_TYPE_OPTIONS.map(opt => opt.value), // 모든 이벤트 타입 포함
+      teams: [], // 모든 팀 포함
     })
   }
 
@@ -57,6 +65,26 @@ function FilterPanel({ filters, onFiltersChange, onClose }) {
                   className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                 />
                 <span className="ml-2 text-sm text-gray-700">{member.name}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* 팀 필터 */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            팀
+          </label>
+          <div className="space-y-2">
+            {teams.map((team) => (
+              <label key={team.id} className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={filters.teams.includes(team.id)}
+                  onChange={() => handleTeamToggle(team.id)}
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                />
+                <span className="ml-2 text-sm text-gray-700">{team.name}</span>
               </label>
             ))}
           </div>
