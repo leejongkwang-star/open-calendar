@@ -26,6 +26,34 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, sele
     return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
   }
 
+  // 사용자가 속한 팀 찾기 (role이 null이 아닌 팀)
+  const getUserTeamId = () => {
+    // 1. currentUser.teamId 우선 사용
+    if (currentUser?.teamId) {
+      return currentUser.teamId
+    }
+    
+    // 2. teams 배열에서 사용자가 속한 팀 찾기 (role이 null이 아닌 팀)
+    if (teams && teams.length > 0) {
+      const userTeam = teams.find(team => team.role !== null && team.role !== undefined)
+      if (userTeam) {
+        return userTeam.id
+      }
+    }
+    
+    // 3. selectedTeamId 사용
+    if (selectedTeamId) {
+      return selectedTeamId
+    }
+    
+    // 4. 마지막으로 teams[0].id 사용
+    if (teams && teams.length > 0) {
+      return teams[0].id
+    }
+    
+    return null
+  }
+
   useEffect(() => {
     if (event) {
       // 수정 모드일 때
@@ -78,7 +106,7 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, sele
           endTime: endTime, // UTC 기준 시간 (DB 원본 값)
           eventType: event.eventType || 'VACATION',
           description: event.description || '',
-          teamId: event.teamId || selectedTeamId || (teams && teams.length > 0 ? teams[0].id : null),
+          teamId: event.teamId || getUserTeamId(),
         })
       } else {
         // 신규 등록 시: 시작일을 선택한 날짜로 설정, 종료일도 시작일과 동일
@@ -97,7 +125,7 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, sele
           endTime: endTime,
           eventType: 'VACATION',
           description: '',
-          teamId: currentUser?.teamId || selectedTeamId || (teams && teams.length > 0 ? teams[0].id : null),
+          teamId: getUserTeamId(),
         })
       }
     } else {
@@ -115,10 +143,10 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, sele
         endTime: endTime,
         eventType: 'VACATION',
         description: '',
-        teamId: currentUser?.teamId || selectedTeamId || (teams && teams.length > 0 ? teams[0].id : null),
+        teamId: getUserTeamId(),
       })
     }
-  }, [event, isEditMode])
+  }, [event, isEditMode, teams, currentUser, selectedTeamId])
 
   const formatDate = (date) => {
     if (!date) return ''
