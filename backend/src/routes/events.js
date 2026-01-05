@@ -464,6 +464,7 @@ router.put(
       return isoRegex.test(value) || dateRegex.test(value)
     }).withMessage('종료일은 유효한 날짜 형식이어야 합니다.'),
     body('eventType').optional().isIn(['VACATION', 'MEETING', 'TRAINING', 'BUSINESS_TRIP', 'OTHER']).withMessage('일정 유형이 올바르지 않습니다.'),
+    body('teamId').optional().isInt().withMessage('팀 ID는 숫자여야 합니다.'),
   ],
   async (req, res, next) => {
     try {
@@ -474,7 +475,7 @@ router.put(
 
       const { id } = req.params
       const userId = req.user.id
-      const { title, startDate, endDate, startTime, endTime, eventType, description } = req.body
+      const { title, startDate, endDate, startTime, endTime, eventType, description, teamId } = req.body
 
       // 이벤트 조회
       const event = await prisma.event.findUnique({
@@ -599,6 +600,25 @@ router.put(
         updateData.eventType = normalizedEventType
       }
       if (description !== undefined) updateData.description = description
+      
+      // teamId 업데이트 (제공된 경우)
+      if (teamId !== undefined) {
+        // 관리자가 아닌 경우에만 팀 구성원 확인
+        if (req.user.role !== 'ADMIN') {
+          // 일반 사용자: 해당 팀의 구성원인지 확인
+          const teamMember = await prisma.teamMember.findFirst({
+            where: {
+              teamId: parseInt(teamId),
+              userId,
+            },
+          })
+
+          if (!teamMember) {
+            return res.status(403).json({ message: '해당 팀의 구성원만 일정을 수정할 수 있습니다.' })
+          }
+        }
+        updateData.teamId = parseInt(teamId)
+      }
 
       // 시작일이 종료일보다 이전인지 확인
       const finalStartDate = updateData.startDate || event.startDate

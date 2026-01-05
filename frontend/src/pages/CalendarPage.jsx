@@ -721,6 +721,7 @@ function CalendarPage() {
         endDate: endDateTime,
         startTime: null, // startTime은 null로 전송 (startDate에 시간 포함)
         endTime: null, // endTime은 null로 전송 (endDate에 시간 포함)
+        teamId: teamId, // teamId 명시적으로 포함
       }
       
       if (selectedEvent?.id) {
