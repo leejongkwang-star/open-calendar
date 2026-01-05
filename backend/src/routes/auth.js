@@ -190,8 +190,24 @@ router.post(
       const { employeeNumber, password } = req.body
 
       // 사용자 조회 (Supabase Pooler 모드 호환성을 위해 findFirst 사용)
+      // 사용자가 속한 팀 정보도 함께 조회
       const user = await prisma.user.findFirst({
         where: { employeeNumber: employeeNumber.toUpperCase() },
+        include: {
+          teams: {
+            select: {
+              teamId: true,
+              team: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+            take: 1, // 첫 번째 팀만
+            orderBy: { createdAt: 'asc' }, // 가장 오래된 팀 우선 (주 팀)
+          },
+        },
       })
 
       if (!user) {
@@ -243,12 +259,16 @@ router.post(
         { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
       )
 
+      // 사용자가 속한 첫 번째 팀의 ID 가져오기
+      const teamId = user.teams[0]?.teamId || null
+
       res.json({
         user: {
           id: user.id,
           employeeNumber: user.employeeNumber,
           name: user.name,
           role: user.role,
+          teamId: teamId, // 사용자가 속한 첫 번째 팀 ID 추가
         },
         token,
       })
