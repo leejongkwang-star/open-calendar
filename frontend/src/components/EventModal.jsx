@@ -97,7 +97,7 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, sele
           endTime: endTime,
           eventType: 'VACATION',
           description: '',
-          teamId: selectedTeamId || (teams && teams.length > 0 ? teams[0].id : null),
+          teamId: currentUser?.teamId || selectedTeamId || (teams && teams.length > 0 ? teams[0].id : null),
         })
       }
     } else {
@@ -115,7 +115,7 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, sele
         endTime: endTime,
         eventType: 'VACATION',
         description: '',
-        teamId: selectedTeamId || (teams && teams.length > 0 ? teams[0].id : null),
+        teamId: currentUser?.teamId || selectedTeamId || (teams && teams.length > 0 ? teams[0].id : null),
       })
     }
   }, [event, isEditMode])
