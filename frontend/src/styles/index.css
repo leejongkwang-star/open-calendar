@@ -372,3 +372,50 @@
   border-radius: 4px;
 }
 
+/* 모바일 최적화: 폰트 크기 축소 (768px 이하) */
+@media (max-width: 768px) {
+  .rbc-calendar {
+    font-size: 12px;
+  }
+  
+  .rbc-header {
+    font-size: 12px;
+    padding: 10px 6px;
+  }
+  
+  .rbc-event {
+    font-size: 11px !important;
+    padding: 3px 6px;
+  }
+  
+  .rbc-date-cell {
+    font-size: 12px;
+    padding: 3px;
+  }
+  
+  .rbc-event-content {
+    font-size: 10px !important;
+  }
+  
+  .rbc-day-view .rbc-event-label,
+  .rbc-week-view .rbc-event-label,
+  .rbc-agenda-view .rbc-event-label {
+    font-size: 11px !important;
+  }
+  
+  .rbc-day-view .rbc-event-content,
+  .rbc-week-view .rbc-event-content,
+  .rbc-agenda-view .rbc-event-content {
+    font-size: 9px !important;
+  }
+  
+  .rbc-toolbar-label {
+    font-size: 16px;
+  }
+  
+  .rbc-toolbar button {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+}
+
