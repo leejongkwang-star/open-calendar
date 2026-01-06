@@ -826,14 +826,19 @@ function CalendarPage() {
     // 일/주 뷰에서 겹치는 이벤트를 세로로 배치하기 위해 전체 너비로 설정
     const isDayOrWeekView = view === 'day' || view === 'week'
     
+    // 모바일 최적화: 화면 크기에 따라 폰트 및 패딩 조정
+    const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768
+    const fontSize = isMobile ? '11px' : '13px'
+    const padding = isMobile ? '3px 6px' : '6px 10px'
+    
     return {
       style: {
         ...style,
         borderRadius: '6px',
         border: `2px solid ${style.borderColor}`,
         borderLeftWidth: '5px',
-        padding: '6px 10px',
-        fontSize: '13px',
+        padding: padding,
+        fontSize: fontSize,
         boxShadow: '0 2px 4px rgba(0, 0, 0, 0.15)',
         minHeight: '24px',
         display: 'flex',
@@ -888,6 +893,11 @@ function CalendarPage() {
     // 일/주 뷰에서만 세로 정렬 적용
     const isDayOrWeekView = view === 'day' || view === 'week'
     
+    // 모바일 최적화: 화면 크기에 따라 폰트 및 패딩 조정
+    const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768
+    const fontSize = isMobile ? '11px' : '13px'
+    const padding = isMobile ? '3px 6px' : '6px 10px'
+    
     return (
       <div
         style={{
@@ -897,8 +907,8 @@ function CalendarPage() {
           border: `2px solid ${style.borderColor}`,
           borderLeftWidth: '5px',
           borderRadius: '6px',
-          padding: '6px 10px',
-          fontSize: '13px',
+          padding: padding,
+          fontSize: fontSize,
           fontWeight: '600',
           boxShadow: '0 2px 4px rgba(0, 0, 0, 0.15)',
           minHeight: '24px',
