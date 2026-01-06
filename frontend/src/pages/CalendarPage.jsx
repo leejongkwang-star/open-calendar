@@ -828,8 +828,8 @@ function CalendarPage() {
     
     // 모바일 최적화: 화면 크기에 따라 폰트 및 패딩 조정
     const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768
-    const fontSize = isMobile ? '11px' : '13px'
-    const padding = isMobile ? '3px 6px' : '6px 10px'
+    const fontSize = isMobile ? '10px' : '13px'
+    const padding = isMobile ? '2px 5px' : '6px 10px'
     
     return {
       style: {
@@ -895,8 +895,8 @@ function CalendarPage() {
     
     // 모바일 최적화: 화면 크기에 따라 폰트 및 패딩 조정
     const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768
-    const fontSize = isMobile ? '11px' : '13px'
-    const padding = isMobile ? '3px 6px' : '6px 10px'
+    const fontSize = isMobile ? '10px' : '13px'
+    const padding = isMobile ? '2px 5px' : '6px 10px'
     
     return (
       <div
