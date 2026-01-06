@@ -375,47 +375,47 @@
 /* 모바일 최적화: 폰트 크기 축소 (768px 이하) */
 @media (max-width: 768px) {
   .rbc-calendar {
-    font-size: 12px;
+    font-size: 11px;
   }
   
   .rbc-header {
-    font-size: 12px;
-    padding: 10px 6px;
+    font-size: 11px;
+    padding: 8px 5px;
   }
   
   .rbc-event {
-    font-size: 11px !important;
-    padding: 3px 6px;
+    font-size: 10px !important;
+    padding: 2px 5px;
   }
   
   .rbc-date-cell {
-    font-size: 12px;
-    padding: 3px;
+    font-size: 11px;
+    padding: 2px;
   }
   
   .rbc-event-content {
-    font-size: 10px !important;
+    font-size: 9px !important;
   }
   
   .rbc-day-view .rbc-event-label,
   .rbc-week-view .rbc-event-label,
   .rbc-agenda-view .rbc-event-label {
-    font-size: 11px !important;
+    font-size: 10px !important;
   }
   
   .rbc-day-view .rbc-event-content,
   .rbc-week-view .rbc-event-content,
   .rbc-agenda-view .rbc-event-content {
-    font-size: 9px !important;
+    font-size: 8px !important;
   }
   
   .rbc-toolbar-label {
-    font-size: 16px;
+    font-size: 14px;
   }
   
   .rbc-toolbar button {
-    padding: 6px 12px;
-    font-size: 12px;
+    padding: 5px 10px;
+    font-size: 11px;
   }
 }
 
