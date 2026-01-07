@@ -955,32 +955,36 @@ function CalendarPage() {
           <h1 className="text-2xl font-bold text-gray-900">캘린더</h1>
           <p className="text-sm text-gray-600 mt-1">팀 일정을 확인하고 관리하세요</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-3 flex-wrap">
           {view === 'month' && (
             <button
               onClick={() => navigate('/lunch-lottery')}
-              className="btn-secondary flex items-center"
+              className="group relative flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 hover:from-purple-600 hover:to-pink-600"
             >
-              <Dice6 className="w-4 h-4 mr-2" />
-              점심당번 뽑기
+              <Dice6 className="w-5 h-5 group-hover:rotate-12 transition-transform duration-200" />
+              <span>점심당번 뽑기</span>
             </button>
           )}
           <button
             onClick={() => setShowFilter(!showFilter)}
-            className={`btn-secondary flex items-center ${showFilter ? 'bg-primary-100' : ''}`}
+            className={`group flex items-center gap-2 px-5 py-2.5 font-semibold rounded-xl shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200 ${
+              showFilter
+                ? 'bg-primary-600 text-white shadow-lg'
+                : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-primary-300 hover:bg-primary-50'
+            }`}
           >
-            <Filter className="w-4 h-4 mr-2" />
-            필터
+            <Filter className={`w-5 h-5 transition-transform duration-200 ${showFilter ? '' : 'group-hover:rotate-90'}`} />
+            <span>필터</span>
           </button>
           <button
             onClick={() => {
               setSelectedEvent(null)
               handleOpenModal()
             }}
-            className="btn-primary flex items-center"
+            className="group flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 hover:from-primary-700 hover:to-primary-800"
           >
-            <Plus className="w-4 h-4 mr-2" />
-            일정 추가
+            <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-200" />
+            <span>일정 추가</span>
           </button>
         </div>
       </div>
