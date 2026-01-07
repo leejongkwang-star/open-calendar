@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Dice6, Users, X } from 'lucide-react'
 import { teamsAPI } from '../api/teams'
@@ -18,6 +18,7 @@ function LunchLotteryPage() {
   const [isDrawing, setIsDrawing] = useState(false) // 뽑기 진행 중
   const [result, setResult] = useState(null) // 뽑기 결과
   const [animationNames, setAnimationNames] = useState([]) // 애니메이션용 이름 목록
+  const resultRef = useRef(null) // 결과 영역 참조
 
   // 팀 목록 로드
   useEffect(() => {
@@ -43,6 +44,24 @@ function LunchLotteryPage() {
       }
     }
   }, [selectedTeamId, allUsers, user])
+
+  // 결과가 나오면 자동으로 스크롤
+  useEffect(() => {
+    if (result && result.length > 0 && !isDrawing) {
+      // 애니메이션 완료 후 스크롤
+      const scrollTimer = setTimeout(() => {
+        if (resultRef.current) {
+          resultRef.current.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center',
+            inline: 'nearest'
+          })
+        }
+      }, 500) // 애니메이션 완료 대기
+      
+      return () => clearTimeout(scrollTimer)
+    }
+  }, [result, isDrawing])
 
   const loadTeams = async () => {
     try {
@@ -214,16 +233,41 @@ function LunchLotteryPage() {
               <input
                 type="number"
                 min="1"
-                max={candidates.length}
+                max={candidates.length || 1}
                 value={drawCount}
                 onChange={(e) => {
-                  const count = parseInt(e.target.value) || 1
-                  setDrawCount(Math.max(1, Math.min(count, candidates.length)))
+                  const inputValue = e.target.value.trim()
+                  
+                  // 빈 문자열이면 1로 설정
+                  if (inputValue === '') {
+                    setDrawCount(1)
+                    return
+                  }
+                  
+                  const numValue = parseInt(inputValue, 10)
+                  
+                  // 숫자가 아니거나 NaN이면 무시
+                  if (isNaN(numValue)) {
+                    return
+                  }
+                  
+                  // 1보다 작으면 1로 설정
+                  if (numValue < 1) {
+                    setDrawCount(1)
+                    return
+                  }
+                  
+                  // 범위 제한
+                  const maxCount = candidates.length > 0 ? candidates.length : 1
+                  const finalValue = Math.min(numValue, maxCount)
+                  setDrawCount(finalValue)
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
               <p className="text-xs text-gray-500 mt-1">
-                최대 {candidates.length}명까지 뽑을 수 있습니다
+                {candidates.length > 0 
+                  ? `최대 ${candidates.length}명까지 뽑을 수 있습니다`
+                  : '대상을 먼저 선택해주세요'}
               </p>
             </div>
 
@@ -295,7 +339,10 @@ function LunchLotteryPage() {
 
         {/* 오른쪽: 뽑기 결과 */}
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6 min-h-[500px] flex items-center justify-center">
+          <div 
+            ref={resultRef}
+            className="bg-white rounded-lg shadow-lg border border-gray-200 p-6 min-h-[500px] flex items-center justify-center"
+          >
             {isDrawing ? (
               // 애니메이션 중
               <div className="text-center w-full">
@@ -316,7 +363,7 @@ function LunchLotteryPage() {
               </div>
             ) : result && result.length > 0 ? (
               // 결과 표시
-              <div className="text-center w-full animate-fade-in">
+              <div className="text-center w-full animate-fade-in" id="lottery-result">
                 <h3 className="text-3xl font-bold text-gray-900 mb-8 flex items-center justify-center gap-2">
                   <span className="text-4xl">🎉</span>
                   <span>뽑기 결과</span>
