@@ -151,6 +151,11 @@ function LunchLotteryPage() {
 
     // 2초 후 결과 표시
     setTimeout(() => {
+      console.log('=== 타이머 실행됨 - 결과 생성 시작 ===')
+      console.log('현재 isDrawing 상태:', isDrawing)
+      console.log('availableCandidates:', availableCandidates.length)
+      console.log('finalDrawCount:', finalDrawCount)
+      
       clearInterval(animationInterval)
       
       // 실제 뽑기 실행 - Fisher-Yates 셔플 알고리즘 사용 (정확한 균등 분포)
@@ -170,9 +175,22 @@ function LunchLotteryPage() {
         selected.push(shuffled[i])
       }
 
+      console.log('뽑기 완료:', selected)
+      console.log('선택된 인원 수:', selected.length)
+      console.log('상태 업데이트 전 - isDrawing:', isDrawing, 'result:', result)
+      
+      console.log('setResult 호출 중...')
       setResult(selected)
+      console.log('setIsDrawing(false) 호출 중...')
       setIsDrawing(false)
       setAnimationNames([])
+      
+      // 상태 업데이트 확인을 위한 추가 로그
+      setTimeout(() => {
+        console.log('상태 업데이트 후 확인 - isDrawing:', isDrawing, 'result:', result)
+      }, 100)
+      
+      console.log('=== 타이머 완료 ===')
     }, 2000)
   }
 
