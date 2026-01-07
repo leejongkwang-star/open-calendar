@@ -19,6 +19,20 @@ function LunchLotteryPage() {
   const [result, setResult] = useState(null) // 뽑기 결과
   const [animationNames, setAnimationNames] = useState([]) // 애니메이션용 이름 목록
   const resultRef = useRef(null) // 결과 영역 참조
+  const animationIntervalRef = useRef(null) // 애니메이션 인터벌 참조
+  const resultTimerRef = useRef(null) // 결과 타이머 참조
+
+  // 컴포넌트 언마운트 시 타이머 정리
+  useEffect(() => {
+    return () => {
+      if (animationIntervalRef.current) {
+        clearInterval(animationIntervalRef.current)
+      }
+      if (resultTimerRef.current) {
+        clearTimeout(resultTimerRef.current)
+      }
+    }
+  }, [])
 
   // 팀 목록 로드
   useEffect(() => {
@@ -110,6 +124,12 @@ function LunchLotteryPage() {
 
   // 뽑기 실행
   const handleDraw = () => {
+    // 이미 뽑는 중이면 무시
+    if (isDrawing) {
+      console.log('이미 뽑는 중입니다.')
+      return
+    }
+
     if (candidates.length === 0) {
       alert('뽑을 대상자가 없습니다.')
       return
@@ -138,12 +158,22 @@ function LunchLotteryPage() {
 
     console.log('뽑기 시작:', { finalDrawCount, availableCandidates: availableCandidates.length })
     
+    // 이전 타이머 정리
+    if (animationIntervalRef.current) {
+      clearInterval(animationIntervalRef.current)
+      animationIntervalRef.current = null
+    }
+    if (resultTimerRef.current) {
+      clearTimeout(resultTimerRef.current)
+      resultTimerRef.current = null
+    }
+    
     setIsDrawing(true)
     setResult(null)
     setAnimationNames([])
 
     // 애니메이션용 이름 목록 생성 (슬롯머신 효과)
-    const animationInterval = setInterval(() => {
+    animationIntervalRef.current = setInterval(() => {
       const randomNames = []
       for (let i = 0; i < finalDrawCount; i++) {
         const randomIndex = Math.floor(Math.random() * availableCandidates.length)
@@ -153,9 +183,14 @@ function LunchLotteryPage() {
     }, 100) // 100ms마다 이름 변경
 
     // 2초 후 결과 표시
-    setTimeout(() => {
+    resultTimerRef.current = setTimeout(() => {
+      console.log('타이머 실행됨 - 결과 생성 시작')
+      
       // 애니메이션 인터벌 정리
-      clearInterval(animationInterval)
+      if (animationIntervalRef.current) {
+        clearInterval(animationIntervalRef.current)
+        animationIntervalRef.current = null
+      }
       
       // 실제 뽑기 실행 - Fisher-Yates 셔플 알고리즘 사용 (정확한 균등 분포)
       const selected = []
@@ -175,16 +210,22 @@ function LunchLotteryPage() {
       }
 
       console.log('뽑기 완료:', selected)
+      console.log('선택된 인원 수:', selected.length)
       
       // 애니메이션 정리
       setAnimationNames([])
       
-      // 상태 업데이트: 결과를 먼저 설정하고, 그 다음에 isDrawing을 false로 설정
-      // React의 상태 업데이트는 비동기이므로, 두 상태를 동시에 업데이트
+      // 상태 업데이트: 결과를 먼저 설정
       setResult(selected)
-      setIsDrawing(false)
       
-      console.log('상태 업데이트 완료:', { isDrawing: false, result: selected })
+      // 다음 틱에서 isDrawing을 false로 설정 (상태 업데이트 보장)
+      setTimeout(() => {
+        setIsDrawing(false)
+        console.log('isDrawing을 false로 설정 완료')
+        console.log('최종 상태:', { isDrawing: false, result: selected, resultLength: selected.length })
+      }, 0)
+      
+      resultTimerRef.current = null
     }, 2000)
   }
 
