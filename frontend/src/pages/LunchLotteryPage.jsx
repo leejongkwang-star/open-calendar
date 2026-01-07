@@ -153,10 +153,19 @@ function LunchLotteryPage() {
     setTimeout(() => {
       clearInterval(animationInterval)
       
-      // 실제 뽑기 실행
+      // 실제 뽑기 실행 - Fisher-Yates 셔플 알고리즘 사용 (정확한 균등 분포)
       const selected = []
-      const shuffled = [...availableCandidates].sort(() => Math.random() - 0.5)
+      const shuffled = [...availableCandidates]
       
+      // Fisher-Yates 셔플 알고리즘
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        // 0부터 i까지의 랜덤 인덱스 선택
+        const j = Math.floor(Math.random() * (i + 1))
+        // 현재 요소와 랜덤으로 선택된 요소 교환
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+      }
+      
+      // 셔플된 배열에서 앞에서부터 필요한 만큼 선택
       for (let i = 0; i < finalDrawCount && i < shuffled.length; i++) {
         selected.push(shuffled[i])
       }
