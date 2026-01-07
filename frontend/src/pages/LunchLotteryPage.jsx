@@ -174,10 +174,17 @@ function LunchLotteryPage() {
         selected.push(shuffled[i])
       }
 
-      // 상태 업데이트
+      console.log('뽑기 완료:', selected)
+      
+      // 애니메이션 정리
+      setAnimationNames([])
+      
+      // 상태 업데이트: 결과를 먼저 설정하고, 그 다음에 isDrawing을 false로 설정
+      // React의 상태 업데이트는 비동기이므로, 두 상태를 동시에 업데이트
       setResult(selected)
       setIsDrawing(false)
-      setAnimationNames([])
+      
+      console.log('상태 업데이트 완료:', { isDrawing: false, result: selected })
     }, 2000)
   }
 
@@ -389,32 +396,54 @@ function LunchLotteryPage() {
                 </div>
                 <p className="text-gray-500 mt-6 text-lg">뽑는 중...</p>
               </div>
-            ) : result && result.length > 0 ? (
-              // 결과 표시
-              <div className="text-center w-full animate-fade-in" id="lottery-result">
-                <h3 className="text-3xl font-bold text-gray-900 mb-8 flex items-center justify-center gap-2">
-                  <span className="text-4xl">🎉</span>
-                  <span>뽑기 결과</span>
-                  <span className="text-4xl">🎉</span>
-                </h3>
+            ) : !isDrawing && result && result.length > 0 ? (
+              // 결과 표시 (당첨 애니메이션)
+              <div className="text-center w-full" id="lottery-result">
+                {/* 축하 메시지 */}
+                <div className="mb-8 animate-fade-in">
+                  <h3 className="text-4xl font-bold text-gray-900 mb-4 flex items-center justify-center gap-3">
+                    <span className="text-5xl animate-bounce">🎉</span>
+                    <span className="bg-gradient-to-r from-primary-600 to-pink-600 bg-clip-text text-transparent">
+                      축하합니다!
+                    </span>
+                    <span className="text-5xl animate-bounce" style={{ animationDelay: '0.2s' }}>🎉</span>
+                  </h3>
+                  <p className="text-xl text-gray-600">당첨자를 발표합니다!</p>
+                </div>
+                
+                {/* 당첨자 카드 */}
                 <div className="space-y-6">
                   {result.map((person, index) => (
                     <div
                       key={person.id}
-                      className="bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl p-8 shadow-2xl transform hover:scale-105 transition-all duration-300 animate-bounce-in"
-                      style={{ animationDelay: `${index * 0.1}s` }}
+                      className="bg-gradient-to-r from-primary-500 via-primary-600 to-pink-500 text-white rounded-2xl p-10 shadow-2xl transform hover:scale-105 transition-all duration-300 animate-bounce-in relative overflow-hidden"
+                      style={{ animationDelay: `${index * 0.15}s` }}
                     >
-                      <div className="text-6xl font-bold mb-3">
-                        {person.name}
-                      </div>
-                      <div className="text-xl opacity-90 mb-2">
-                        {person.employeeNumber}
-                      </div>
-                      {result.length > 1 && (
-                        <div className="text-base opacity-75 mt-3 bg-white bg-opacity-20 rounded-full px-4 py-1 inline-block">
-                          {index + 1}번째 당번
+                      {/* 배경 효과 */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-50"></div>
+                      
+                      {/* 내용 */}
+                      <div className="relative z-10">
+                        <div className="text-7xl font-bold mb-4 animate-pulse">
+                          {person.name}
                         </div>
-                      )}
+                        <div className="text-2xl opacity-90 mb-3 font-semibold">
+                          {person.employeeNumber}
+                        </div>
+                        {result.length > 1 && (
+                          <div className="text-lg opacity-90 mt-4 bg-white bg-opacity-30 rounded-full px-6 py-2 inline-block font-semibold">
+                            {index + 1}번째 당번
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* 장식 효과 */}
+                      <div className="absolute top-2 right-2 text-4xl opacity-30 animate-spin" style={{ animationDuration: '3s' }}>
+                        ⭐
+                      </div>
+                      <div className="absolute bottom-2 left-2 text-4xl opacity-30 animate-spin" style={{ animationDuration: '4s', animationDirection: 'reverse' }}>
+                        ✨
+                      </div>
                     </div>
                   ))}
                 </div>
