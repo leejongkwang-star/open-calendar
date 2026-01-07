@@ -19,20 +19,6 @@ function LunchLotteryPage() {
   const [result, setResult] = useState(null) // 뽑기 결과
   const [animationNames, setAnimationNames] = useState([]) // 애니메이션용 이름 목록
   const resultRef = useRef(null) // 결과 영역 참조
-  const animationIntervalRef = useRef(null) // 애니메이션 인터벌 참조
-  const resultTimerRef = useRef(null) // 결과 타이머 참조
-
-  // 컴포넌트 언마운트 시 타이머 정리
-  useEffect(() => {
-    return () => {
-      if (animationIntervalRef.current) {
-        clearInterval(animationIntervalRef.current)
-      }
-      if (resultTimerRef.current) {
-        clearTimeout(resultTimerRef.current)
-      }
-    }
-  }, [])
 
   // 팀 목록 로드
   useEffect(() => {
@@ -122,26 +108,8 @@ function LunchLotteryPage() {
     )
   }
 
-  // 뽑기 실행
+  // 뽑기 실행 (버튼 스타일 수정 전, 잘 동작하던 단순 버전으로 롤백)
   const handleDraw = () => {
-    // 이미 뽑는 중이면 무시 (하지만 타이머가 정리되지 않은 경우를 대비해 정리)
-    if (isDrawing) {
-      console.log('이미 뽑는 중입니다. 타이머 정리 중...')
-      // 타이머가 정리되지 않은 경우를 대비해 강제 정리
-      if (animationIntervalRef.current) {
-        clearInterval(animationIntervalRef.current)
-        animationIntervalRef.current = null
-      }
-      if (resultTimerRef.current) {
-        clearTimeout(resultTimerRef.current)
-        resultTimerRef.current = null
-      }
-      // 상태 강제 초기화
-      setIsDrawing(false)
-      setAnimationNames([])
-      return
-    }
-
     if (candidates.length === 0) {
       alert('뽑을 대상자가 없습니다.')
       return
@@ -164,28 +132,15 @@ function LunchLotteryPage() {
     }
     
     // drawCount가 빈 문자열이었으면 1로 업데이트
-    if (drawCount === '' || (typeof drawCount === 'number' && drawCount < 1)) {
+    if (drawCount === '' || drawCount < 1) {
       setDrawCount(1)
     }
 
-    console.log('뽑기 시작:', { finalDrawCount, availableCandidates: availableCandidates.length })
-    
-    // 이전 타이머 정리
-    if (animationIntervalRef.current) {
-      clearInterval(animationIntervalRef.current)
-      animationIntervalRef.current = null
-    }
-    if (resultTimerRef.current) {
-      clearTimeout(resultTimerRef.current)
-      resultTimerRef.current = null
-    }
-    
     setIsDrawing(true)
     setResult(null)
-    setAnimationNames([])
 
     // 애니메이션용 이름 목록 생성 (슬롯머신 효과)
-    animationIntervalRef.current = setInterval(() => {
+    const animationInterval = setInterval(() => {
       const randomNames = []
       for (let i = 0; i < finalDrawCount; i++) {
         const randomIndex = Math.floor(Math.random() * availableCandidates.length)
@@ -195,14 +150,8 @@ function LunchLotteryPage() {
     }, 100) // 100ms마다 이름 변경
 
     // 2초 후 결과 표시
-    resultTimerRef.current = setTimeout(() => {
-      console.log('타이머 실행됨 - 결과 생성 시작')
-      
-      // 애니메이션 인터벌 정리
-      if (animationIntervalRef.current) {
-        clearInterval(animationIntervalRef.current)
-        animationIntervalRef.current = null
-      }
+    setTimeout(() => {
+      clearInterval(animationInterval)
       
       // 실제 뽑기 실행 - Fisher-Yates 셔플 알고리즘 사용 (정확한 균등 분포)
       const selected = []
@@ -221,60 +170,25 @@ function LunchLotteryPage() {
         selected.push(shuffled[i])
       }
 
-      console.log('뽑기 완료:', selected)
-      console.log('선택된 인원 수:', selected.length)
-      
-      // 애니메이션 정리
-      setAnimationNames([])
-      
-      // 상태 업데이트: 결과와 isDrawing을 동시에 업데이트 (이전 버전과 동일하게)
       setResult(selected)
       setIsDrawing(false)
       setAnimationNames([])
-      
-      resultTimerRef.current = null
     }, 2000)
   }
 
   // 재뽑기
   const handleRedraw = () => {
-    // 이전 타이머 정리
-    if (animationIntervalRef.current) {
-      clearInterval(animationIntervalRef.current)
-      animationIntervalRef.current = null
-    }
-    if (resultTimerRef.current) {
-      clearTimeout(resultTimerRef.current)
-      resultTimerRef.current = null
-    }
-    
     setResult(null)
-    setIsDrawing(false)
-    setAnimationNames([])
-    
-    // 약간의 딜레이 후 다시 뽑기 (상태 업데이트 보장)
-    setTimeout(() => {
-      handleDraw()
-    }, 100)
+    handleDraw()
   }
 
   // 초기화
   const handleReset = () => {
-    // 이전 타이머 정리
-    if (animationIntervalRef.current) {
-      clearInterval(animationIntervalRef.current)
-      animationIntervalRef.current = null
-    }
-    if (resultTimerRef.current) {
-      clearTimeout(resultTimerRef.current)
-      resultTimerRef.current = null
-    }
-    
     setResult(null)
-    setIsDrawing(false)
     setExcludeUserIds([])
     setDrawCount(1)
     setAnimationNames([])
+    setIsDrawing(false)
   }
 
   return (
