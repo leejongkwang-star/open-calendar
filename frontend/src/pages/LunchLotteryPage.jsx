@@ -151,6 +151,16 @@ function LunchLotteryPage() {
 
     // 2초 후 결과 표시
     setTimeout(() => {
+      // 에러 처리 함수를 별도로 분리하여 변수명 충돌 방지
+      const handleError = (errorObj) => {
+        console.error('타이머 실행 중 에러 발생:', errorObj)
+        console.error('에러 상세:', errorObj?.message || errorObj, errorObj?.stack)
+        // 에러 발생 시에도 상태 초기화
+        setIsDrawing(false)
+        setAnimationNames([])
+        setResult(null)
+      }
+
       try {
         console.log('=== 타이머 실행됨 - 결과 생성 시작 ===')
         console.log('availableCandidates:', availableCandidates.length)
@@ -159,7 +169,7 @@ function LunchLotteryPage() {
         clearInterval(animationInterval)
         
         // 실제 뽑기 실행 - Fisher-Yates 셔플 알고리즘 사용 (정확한 균등 분포)
-        const selected = []
+        const drawnCandidates = []
         const shuffled = [...availableCandidates]
         
         // Fisher-Yates 셔플 알고리즘
@@ -172,28 +182,23 @@ function LunchLotteryPage() {
         
         // 셔플된 배열에서 앞에서부터 필요한 만큼 선택
         for (let i = 0; i < finalDrawCount && i < shuffled.length; i++) {
-          selected.push(shuffled[i])
+          drawnCandidates.push(shuffled[i])
         }
 
-        console.log('뽑기 완료:', selected)
-        console.log('선택된 인원 수:', selected.length)
+        console.log('뽑기 완료:', drawnCandidates)
+        console.log('선택된 인원 수:', drawnCandidates.length)
         
         // 상태 업데이트: 결과와 isDrawing을 동시에 업데이트
         // React의 상태 업데이트는 비동기이므로, 함수형 업데이트를 사용하지 않고 직접 값 설정
         console.log('setResult 호출 중...')
-        setResult(selected)
+        setResult(drawnCandidates)
         console.log('setIsDrawing(false) 호출 중...')
         setIsDrawing(false)
         setAnimationNames([])
         
         console.log('=== 타이머 완료 ===')
-      } catch (err) {
-        console.error('타이머 실행 중 에러 발생:', err)
-        console.error('에러 상세:', err?.message || err, err?.stack)
-        // 에러 발생 시에도 상태 초기화
-        setIsDrawing(false)
-        setAnimationNames([])
-        setResult(null)
+      } catch (errorObj) {
+        handleError(errorObj)
       }
     }, 2000)
   }
