@@ -67,8 +67,8 @@ function LunchLotteryPage() {
     try {
       const data = await teamsAPI.getTeams()
       setTeams(data || [])
-    } catch (error) {
-      console.error('팀 목록 로드 실패:', error)
+    } catch (err) {
+      console.error('팀 목록 로드 실패:', err)
       setTeams([])
     }
   }
@@ -77,8 +77,8 @@ function LunchLotteryPage() {
     try {
       const data = await authAPI.getAllUsers({ status: 'APPROVED' })
       setAllUsers(data || [])
-    } catch (error) {
-      console.error('전체 사용자 로드 실패:', error)
+    } catch (err) {
+      console.error('전체 사용자 로드 실패:', err)
       setAllUsers([])
     }
   }
@@ -92,8 +92,8 @@ function LunchLotteryPage() {
         name: m.name,
         employeeNumber: m.employeeNumber
       })))
-    } catch (error) {
-      console.error('팀 구성원 로드 실패:', error)
+    } catch (err) {
+      console.error('팀 구성원 로드 실패:', err)
       setTeamMembers([])
       setCandidates([])
     }
