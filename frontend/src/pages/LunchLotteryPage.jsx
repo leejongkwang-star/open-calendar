@@ -151,6 +151,7 @@ function LunchLotteryPage() {
 
     // 2초 후 결과 표시
     setTimeout(() => {
+      // 애니메이션 인터벌 정리
       clearInterval(animationInterval)
       
       // 실제 뽑기 실행 - Fisher-Yates 셔플 알고리즘 사용 (정확한 균등 분포)
