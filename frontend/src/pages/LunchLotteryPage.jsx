@@ -152,10 +152,7 @@ function LunchLotteryPage() {
     // 2초 후 결과 표시
     setTimeout(() => {
       // 에러 처리 함수를 별도로 분리하여 변수명 충돌 방지
-      const handleError = (errorObj) => {
-        console.error('타이머 실행 중 에러 발생:', errorObj)
-        console.error('에러 상세:', errorObj?.message || errorObj, errorObj?.stack)
-        // 에러 발생 시에도 상태 초기화
+      const resetDrawingState = () => {
         setIsDrawing(false)
         setAnimationNames([])
         setResult(null)
@@ -197,8 +194,10 @@ function LunchLotteryPage() {
         setAnimationNames([])
         
         console.log('=== 타이머 완료 ===')
-      } catch (errorObj) {
-        handleError(errorObj)
+      } catch {
+        // catch 블록에서 변수를 사용하지 않아 변수명 충돌 방지
+        console.error('타이머 실행 중 에러 발생')
+        resetDrawingState()
       }
     }, 2000)
   }
