@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import moment from 'moment'
 import 'moment/locale/ko'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
-import { Plus, Filter } from 'lucide-react'
+import { Plus, Filter, Dice6 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { eventsAPI } from '../api/events'
 import { teamsAPI } from '../api/teams'
@@ -956,6 +956,15 @@ function CalendarPage() {
           <p className="text-sm text-gray-600 mt-1">팀 일정을 확인하고 관리하세요</p>
         </div>
         <div className="flex gap-2">
+          {view === 'month' && (
+            <button
+              onClick={() => navigate('/lunch-lottery')}
+              className="btn-secondary flex items-center"
+            >
+              <Dice6 className="w-4 h-4 mr-2" />
+              점심당번 뽑기
+            </button>
+          )}
           <button
             onClick={() => setShowFilter(!showFilter)}
             className={`btn-secondary flex items-center ${showFilter ? 'bg-primary-100' : ''}`}
