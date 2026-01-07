@@ -132,12 +132,15 @@ function LunchLotteryPage() {
     }
     
     // drawCount가 빈 문자열이었으면 1로 업데이트
-    if (drawCount === '' || drawCount < 1) {
+    if (drawCount === '' || (typeof drawCount === 'number' && drawCount < 1)) {
       setDrawCount(1)
     }
 
+    console.log('뽑기 시작:', { finalDrawCount, availableCandidates: availableCandidates.length })
+    
     setIsDrawing(true)
     setResult(null)
+    setAnimationNames([])
 
     // 애니메이션용 이름 목록 생성 (슬롯머신 효과)
     const animationInterval = setInterval(() => {
@@ -171,6 +174,7 @@ function LunchLotteryPage() {
         selected.push(shuffled[i])
       }
 
+      // 상태 업데이트
       setResult(selected)
       setIsDrawing(false)
       setAnimationNames([])
@@ -372,7 +376,7 @@ function LunchLotteryPage() {
               <div className="text-center w-full">
                 <Dice6 className="w-20 h-20 mx-auto mb-6 text-primary-600 animate-spin" />
                 <div className="space-y-6">
-                  {Array.from({ length: drawCount }).map((_, index) => (
+                  {Array.from({ length: (typeof drawCount === 'number' && drawCount > 0) ? drawCount : 1 }).map((_, index) => (
                     <div
                       key={index}
                       className="bg-gradient-to-r from-primary-100 to-primary-200 rounded-lg p-6 border-2 border-primary-300"
