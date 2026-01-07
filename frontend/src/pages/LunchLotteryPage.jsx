@@ -123,9 +123,17 @@ function LunchLotteryPage() {
       return
     }
 
-    if (drawCount > availableCandidates.length) {
-      alert(`뽑을 인원 수(${drawCount})가 대상자 수(${availableCandidates.length})보다 많습니다.`)
+    // drawCount가 빈 문자열이거나 유효하지 않으면 1로 설정
+    const finalDrawCount = (typeof drawCount === 'number' && drawCount > 0) ? drawCount : 1
+    
+    if (finalDrawCount > availableCandidates.length) {
+      alert(`뽑을 인원 수(${finalDrawCount})가 대상자 수(${availableCandidates.length})보다 많습니다.`)
       return
+    }
+    
+    // drawCount가 빈 문자열이었으면 1로 업데이트
+    if (drawCount === '' || drawCount < 1) {
+      setDrawCount(1)
     }
 
     setIsDrawing(true)
@@ -134,7 +142,7 @@ function LunchLotteryPage() {
     // 애니메이션용 이름 목록 생성 (슬롯머신 효과)
     const animationInterval = setInterval(() => {
       const randomNames = []
-      for (let i = 0; i < drawCount; i++) {
+      for (let i = 0; i < finalDrawCount; i++) {
         const randomIndex = Math.floor(Math.random() * availableCandidates.length)
         randomNames.push(availableCandidates[randomIndex].name)
       }
@@ -149,7 +157,7 @@ function LunchLotteryPage() {
       const selected = []
       const shuffled = [...availableCandidates].sort(() => Math.random() - 0.5)
       
-      for (let i = 0; i < drawCount && i < shuffled.length; i++) {
+      for (let i = 0; i < finalDrawCount && i < shuffled.length; i++) {
         selected.push(shuffled[i])
       }
 
@@ -236,11 +244,11 @@ function LunchLotteryPage() {
                 max={candidates.length || 1}
                 value={drawCount}
                 onChange={(e) => {
-                  const inputValue = e.target.value.trim()
+                  const inputValue = e.target.value
                   
-                  // 빈 문자열이면 1로 설정
+                  // 빈 문자열이면 빈 문자열로 설정 (지울 수 있게)
                   if (inputValue === '') {
-                    setDrawCount(1)
+                    setDrawCount('')
                     return
                   }
                   
@@ -251,9 +259,8 @@ function LunchLotteryPage() {
                     return
                   }
                   
-                  // 1보다 작으면 1로 설정
+                  // 1보다 작으면 무시 (사용자가 입력 중일 수 있음)
                   if (numValue < 1) {
-                    setDrawCount(1)
                     return
                   }
                   
@@ -261,6 +268,13 @@ function LunchLotteryPage() {
                   const maxCount = candidates.length > 0 ? candidates.length : 1
                   const finalValue = Math.min(numValue, maxCount)
                   setDrawCount(finalValue)
+                }}
+                onBlur={(e) => {
+                  // 포커스를 잃을 때 빈 값이거나 1보다 작으면 1로 설정
+                  const value = e.target.value
+                  if (value === '' || parseInt(value, 10) < 1 || isNaN(parseInt(value, 10))) {
+                    setDrawCount(1)
+                  }
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
