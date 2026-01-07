@@ -187,9 +187,9 @@ function LunchLotteryPage() {
         setAnimationNames([])
         
         console.log('=== 타이머 완료 ===')
-      } catch (error) {
-        console.error('타이머 실행 중 에러 발생:', error)
-        console.error('에러 상세:', error.message, error.stack)
+      } catch (err) {
+        console.error('타이머 실행 중 에러 발생:', err)
+        console.error('에러 상세:', err?.message || err, err?.stack)
         // 에러 발생 시에도 상태 초기화
         setIsDrawing(false)
         setAnimationNames([])
