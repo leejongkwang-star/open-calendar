@@ -5,6 +5,36 @@ import { teamsAPI } from '../api/teams'
 import { authAPI } from '../api/auth'
 import { useAuthStore } from '../store/authStore'
 
+// 뽑기 실행 로직을 컴포넌트 바깥의 순수 함수로 분리
+// - 번들/압축 시 동일 스코프 내 변수명 재사용으로 인한 TDZ 문제를 최소화
+// - React 상태 업데이트 함수들만 인자로 주입
+function executeDraw(candidateList, count, intervalId, setResult, setIsDrawing, setAnimationNames) {
+  // 애니메이션 타이머 정리
+  clearInterval(intervalId)
+
+  // 실제 뽑기 실행 - Fisher-Yates 셔플 알고리즘 사용 (정확한 균등 분포)
+  const winners = []
+  const shuffledArray = [...candidateList]
+
+  // Fisher-Yates 셔플 알고리즘
+  for (let i = shuffledArray.length - 1; i > 0; i--) {
+    // 0부터 i까지의 랜덤 인덱스 선택
+    const randomIdx = Math.floor(Math.random() * (i + 1))
+    // 현재 요소와 랜덤으로 선택된 요소 교환
+    ;[shuffledArray[i], shuffledArray[randomIdx]] = [shuffledArray[randomIdx], shuffledArray[i]]
+  }
+
+  // 셔플된 배열에서 앞에서부터 필요한 만큼 선택
+  for (let i = 0; i < count && i < shuffledArray.length; i++) {
+    winners.push(shuffledArray[i])
+  }
+
+  // 상태 업데이트
+  setResult(winners)
+  setIsDrawing(false)
+  setAnimationNames([])
+}
+
 function LunchLotteryPage() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
@@ -130,7 +160,7 @@ function LunchLotteryPage() {
       alert(`뽑을 인원 수(${finalDrawCount})가 대상자 수(${availableCandidates.length})보다 많습니다.`)
       return
     }
-    
+
     // drawCount가 빈 문자열이었으면 1로 업데이트
     if (drawCount === '' || drawCount < 1) {
       setDrawCount(1)
@@ -151,54 +181,7 @@ function LunchLotteryPage() {
 
     // 2초 후 결과 표시
     setTimeout(() => {
-      // 에러 처리 함수를 별도로 분리하여 변수명 충돌 방지
-      const resetDrawingState = () => {
-        setIsDrawing(false)
-        setAnimationNames([])
-        setResult(null)
-      }
-
-      try {
-        console.log('=== 타이머 실행됨 - 결과 생성 시작 ===')
-        console.log('availableCandidates:', availableCandidates.length)
-        console.log('finalDrawCount:', finalDrawCount)
-        
-        clearInterval(animationInterval)
-        
-        // 실제 뽑기 실행 - Fisher-Yates 셔플 알고리즘 사용 (정확한 균등 분포)
-        const drawnCandidates = []
-        const shuffled = [...availableCandidates]
-        
-        // Fisher-Yates 셔플 알고리즘
-        for (let i = shuffled.length - 1; i > 0; i--) {
-          // 0부터 i까지의 랜덤 인덱스 선택
-          const j = Math.floor(Math.random() * (i + 1))
-          // 현재 요소와 랜덤으로 선택된 요소 교환
-          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
-        }
-        
-        // 셔플된 배열에서 앞에서부터 필요한 만큼 선택
-        for (let i = 0; i < finalDrawCount && i < shuffled.length; i++) {
-          drawnCandidates.push(shuffled[i])
-        }
-
-        console.log('뽑기 완료:', drawnCandidates)
-        console.log('선택된 인원 수:', drawnCandidates.length)
-        
-        // 상태 업데이트: 결과와 isDrawing을 동시에 업데이트
-        // React의 상태 업데이트는 비동기이므로, 함수형 업데이트를 사용하지 않고 직접 값 설정
-        console.log('setResult 호출 중...')
-        setResult(drawnCandidates)
-        console.log('setIsDrawing(false) 호출 중...')
-        setIsDrawing(false)
-        setAnimationNames([])
-        
-        console.log('=== 타이머 완료 ===')
-      } catch {
-        // catch 블록에서 변수를 사용하지 않아 변수명 충돌 방지
-        console.error('타이머 실행 중 에러 발생')
-        resetDrawingState()
-      }
+      executeDraw(availableCandidates, finalDrawCount, animationInterval, setResult, setIsDrawing, setAnimationNames)
     }, 2000)
   }
 
