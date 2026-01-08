@@ -5,6 +5,22 @@ import { teamsAPI } from '../api/teams'
 import { authAPI } from '../api/auth'
 import { useAuthStore } from '../store/authStore'
 
+// 더 나은 랜덤성을 위한 헬퍼 함수
+// crypto.getRandomValues()를 사용하여 Math.random()의 시드 문제 해결
+function getSecureRandomIndex(max) {
+  // crypto API가 사용 가능한 경우 (대부분의 최신 브라우저)
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const array = new Uint32Array(1)
+    crypto.getRandomValues(array)
+    // 0부터 max까지의 정수 반환
+    return array[0] % (max + 1)
+  }
+  // 폴백: Math.random() 사용 (구형 브라우저 대응)
+  // 추가 랜덤화를 위해 현재 시간 기반 시드 추가
+  const timeSeed = Date.now() % 1000
+  return Math.floor((Math.random() + timeSeed / 10000) * (max + 1)) % (max + 1)
+}
+
 // 뽑기 실행 로직을 컴포넌트 바깥의 순수 함수로 분리
 // - 번들/압축 시 동일 스코프 내 변수명 재사용으로 인한 TDZ 문제를 최소화
 // - React 상태 업데이트 함수들만 인자로 주입
@@ -22,10 +38,10 @@ function executeDraw(candidateList, count, intervalId, setResult, setIsDrawing, 
   const winners = []
   const shuffledArray = [...uniqueCandidates]
 
-  // Fisher-Yates 셔플 알고리즘
+  // Fisher-Yates 셔플 알고리즘 (crypto.getRandomValues() 사용으로 시드 문제 해결)
   for (let i = shuffledArray.length - 1; i > 0; i--) {
-    // 0부터 i까지의 랜덤 인덱스 선택
-    const randomIdx = Math.floor(Math.random() * (i + 1))
+    // 0부터 i까지의 랜덤 인덱스 선택 (crypto API 사용)
+    const randomIdx = getSecureRandomIndex(i)
     // 현재 요소와 랜덤으로 선택된 요소 교환
     ;[shuffledArray[i], shuffledArray[randomIdx]] = [shuffledArray[randomIdx], shuffledArray[i]]
   }
@@ -182,6 +198,7 @@ function LunchLotteryPage() {
     setResult(null)
 
     // 애니메이션용 이름 목록 생성 (슬롯머신 효과)
+    // 애니메이션은 단순 시각 효과이므로 Math.random() 사용 (성능 고려)
     const animationInterval = setInterval(() => {
       const randomNames = []
       for (let i = 0; i < finalDrawCount; i++) {
