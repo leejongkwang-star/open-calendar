@@ -12,9 +12,15 @@ function executeDraw(candidateList, count, intervalId, setResult, setIsDrawing, 
   // 애니메이션 타이머 정리
   clearInterval(intervalId)
 
+  // 방어적 프로그래밍: 중복 제거 (입력 데이터 검증)
+  // candidateList에 중복이 있어도 안전하게 처리
+  const uniqueCandidates = Array.from(
+    new Map(candidateList.map(c => [c.id, c])).values()
+  )
+
   // 실제 뽑기 실행 - Fisher-Yates 셔플 알고리즘 사용 (정확한 균등 분포)
   const winners = []
-  const shuffledArray = [...candidateList]
+  const shuffledArray = [...uniqueCandidates]
 
   // Fisher-Yates 셔플 알고리즘
   for (let i = shuffledArray.length - 1; i > 0; i--) {
@@ -145,8 +151,14 @@ function LunchLotteryPage() {
       return
     }
 
-    // 제외 인원 필터링
-    const availableCandidates = candidates.filter(c => !excludeUserIds.includes(c.id))
+    // 제외 인원 필터링 및 중복 제거
+    // 1단계: id 기준으로 중복 제거 (Map 사용으로 효율적 처리)
+    const uniqueCandidates = Array.from(
+      new Map(candidates.map(c => [c.id, c])).values()
+    )
+    
+    // 2단계: 제외할 인원 필터링
+    const availableCandidates = uniqueCandidates.filter(c => !excludeUserIds.includes(c.id))
     
     if (availableCandidates.length === 0) {
       alert('제외할 인원이 너무 많습니다. 뽑을 대상자가 없습니다.')
