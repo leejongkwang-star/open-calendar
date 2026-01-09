@@ -1031,6 +1031,7 @@ function CalendarPage() {
           startAccessor="start"
           endAccessor="end"
           style={{ height: '100%', minHeight: '650px' }}
+          views={{ month: true }}
           view={view}
           onView={handleViewChange}
           date={selectedDate}
