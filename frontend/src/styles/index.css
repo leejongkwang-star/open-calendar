@@ -74,30 +74,62 @@
   min-width: 40px !important;
 }
 
-/* 월뷰 날짜 셀도 동일하게 조정 */
-.rbc-month-view .rbc-day-bg {
-  flex: 1;
+/* 월뷰 테이블 레이아웃 고정 */
+.rbc-month-view {
+  table-layout: fixed !important;
 }
 
-/* 평일 날짜 셀 (월~금) 확대 */
+/* 월뷰 날짜 셀도 동일하게 조정 - width 직접 지정 */
+.rbc-month-view .rbc-day-bg {
+  width: auto !important;
+}
+
+/* 평일 날짜 셀 (월~금) 확대 - 18%씩 */
 .rbc-month-view .rbc-row .rbc-day-bg:nth-child(2),
 .rbc-month-view .rbc-row .rbc-day-bg:nth-child(3),
 .rbc-month-view .rbc-row .rbc-day-bg:nth-child(4),
 .rbc-month-view .rbc-row .rbc-day-bg:nth-child(5),
 .rbc-month-view .rbc-row .rbc-day-bg:nth-child(6) {
-  flex: 2 !important;
+  width: 18% !important;
   min-width: 80px !important;
 }
 
-/* 일요일 날짜 셀 축소 */
+/* 일요일 날짜 셀 축소 - 5% */
 .rbc-month-view .rbc-row .rbc-day-bg:first-child {
-  flex: 0.5 !important;
+  width: 5% !important;
   min-width: 40px !important;
 }
 
-/* 토요일 날짜 셀 축소 */
+/* 토요일 날짜 셀 축소 - 5% */
 .rbc-month-view .rbc-row .rbc-day-bg:last-child {
-  flex: 0.5 !important;
+  width: 5% !important;
+  min-width: 40px !important;
+}
+
+/* 헤더도 동일하게 조정 - width 직접 지정 */
+.rbc-month-view .rbc-header {
+  width: auto !important;
+}
+
+/* 평일 헤더 (월~금) 확대 */
+.rbc-month-view .rbc-header:nth-child(2),
+.rbc-month-view .rbc-header:nth-child(3),
+.rbc-month-view .rbc-header:nth-child(4),
+.rbc-month-view .rbc-header:nth-child(5),
+.rbc-month-view .rbc-header:nth-child(6) {
+  width: 18% !important;
+  min-width: 80px !important;
+}
+
+/* 일요일 헤더 축소 */
+.rbc-month-view .rbc-header:first-child {
+  width: 5% !important;
+  min-width: 40px !important;
+}
+
+/* 토요일 헤더 축소 */
+.rbc-month-view .rbc-header:last-child {
+  width: 5% !important;
   min-width: 40px !important;
 }
 
