@@ -1012,7 +1012,7 @@ function CalendarPage() {
       )}
 
       {/* 캘린더 */}
-      <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6" style={{ minHeight: '700px' }}>
+      <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-2 sm:p-3 md:p-4" style={{ minHeight: '700px' }}>
         <Calendar
           localizer={localizer}
           events={filteredEvents.map(event => {
