@@ -32,6 +32,9 @@ function CalendarPage() {
   const [popupEvent, setPopupEvent] = useState(null)
   const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 })
   const [showFilter, setShowFilter] = useState(false)
+  const [showMoreEventsModal, setShowMoreEventsModal] = useState(false)
+  const [moreEventsDate, setMoreEventsDate] = useState(null)
+  const [moreEvents, setMoreEvents] = useState([])
   const [filters, setFilters] = useState({
     members: [],
     eventTypes: ['VACATION', 'MEETING', 'TRAINING', 'BUSINESS_TRIP', 'OTHER'],
@@ -120,6 +123,25 @@ function CalendarPage() {
       setSelectedEvent(event)
       handleOpenModal()
     }
+  }
+
+  // "+N more" 클릭 핸들러 (옵션 3)
+  const handleShowMore = (events, date) => {
+    // react-big-calendar의 onShowMore는 (events, date) 형식으로 호출됨
+    // events는 해당 날짜에 표시되지 않은 나머지 이벤트들
+    // date는 클릭된 날짜
+    
+    // 같은 날짜의 모든 일정 필터링 (표시된 것 + 표시되지 않은 것 모두 포함)
+    const dateStr = moment(date).format('YYYY-MM-DD')
+    const sameDateEvents = filteredEvents.filter(event => {
+      const eventStart = moment(event.start).format('YYYY-MM-DD')
+      const eventEnd = moment(event.end).format('YYYY-MM-DD')
+      return eventStart <= dateStr && eventEnd >= dateStr
+    })
+    
+    setMoreEventsDate(date)
+    setMoreEvents(sameDateEvents)
+    setShowMoreEventsModal(true)
   }
 
   // 날짜 클릭 핸들러
@@ -1038,6 +1060,7 @@ function CalendarPage() {
           onNavigate={setSelectedDate}
           onSelectEvent={handleSelectEvent}
           onSelectSlot={handleSelectSlot}
+          onShowMore={handleShowMore}
           selectable
           eventPropGetter={eventStyleGetter}
           components={calendarComponents}
@@ -1083,6 +1106,105 @@ function CalendarPage() {
           teams={teams}
           selectedTeamId={selectedTeamId}
         />
+      )}
+
+      {/* "+N more" 일정 목록 모달 (옵션 3) */}
+      {showMoreEventsModal && moreEventsDate && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+            {/* 헤더 */}
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900">
+                {moment(moreEventsDate).format('YYYY년 M월 D일 (ddd)')} 일정
+              </h2>
+              <button
+                onClick={() => setShowMoreEventsModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* 일정 목록 */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {moreEvents.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">이 날짜에 일정이 없습니다.</p>
+              ) : (
+                <div className="space-y-3">
+                  {moreEvents.map((event) => {
+                    const eventTypeColor = {
+                      VACATION: { bg: '#2563eb', border: '#1e40af' },
+                      MEETING: { bg: '#059669', border: '#047857' },
+                      TRAINING: { bg: '#ea580c', border: '#c2410c' },
+                      BUSINESS_TRIP: { bg: '#0891b2', border: '#0e7490' },
+                      OTHER: { bg: '#7c3aed', border: '#6d28d9' },
+                    }[event.eventType] || { bg: '#4b5563', border: '#374151' }
+
+                    return (
+                      <div
+                        key={event.id}
+                        onClick={() => {
+                          setShowMoreEventsModal(false)
+                          setSelectedEvent(event)
+                          handleOpenModal()
+                        }}
+                        className="p-4 rounded-lg border-2 cursor-pointer hover:shadow-md transition-shadow"
+                        style={{
+                          backgroundColor: `${eventTypeColor.bg}15`,
+                          borderColor: eventTypeColor.border,
+                        }}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span
+                                className="px-2 py-1 rounded text-xs font-semibold text-white"
+                                style={{ backgroundColor: eventTypeColor.bg }}
+                              >
+                                {toKoreanEventType(event.eventType)}
+                              </span>
+                              {event.userName && (
+                                <span className="text-sm font-medium text-gray-700">
+                                  {event.userName}
+                                </span>
+                              )}
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 mb-1">
+                              {event.title}
+                            </h3>
+                            {event.description && (
+                              <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+                                {event.description}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-4 text-xs text-gray-500">
+                              <span>
+                                {moment(event.start).format('YYYY-MM-DD HH:mm')} ~{' '}
+                                {moment(event.end).format('YYYY-MM-DD HH:mm')}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 푸터 */}
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={() => setShowMoreEventsModal(false)}
+                className="w-full px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded-lg transition-colors"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
