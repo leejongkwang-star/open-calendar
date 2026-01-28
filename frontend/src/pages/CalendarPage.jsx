@@ -1177,8 +1177,8 @@ function CalendarPage() {
                             )}
                             <div className="flex items-center gap-4 text-xs text-gray-500">
                               <span>
-                                {moment(event.start).format('YYYY-MM-DD HH:mm')} ~{' '}
-                                {moment(event.end).format('YYYY-MM-DD HH:mm')}
+                                {moment(event.startDate || event.start).format('YYYY-MM-DD HH:mm')} ~{' '}
+                                {moment(event.endDate || event.end).format('YYYY-MM-DD HH:mm')}
                               </span>
                             </div>
                           </div>
