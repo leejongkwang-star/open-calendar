@@ -128,19 +128,15 @@ function CalendarPage() {
   // "+N more" 클릭 핸들러 (옵션 3)
   const handleShowMore = (events, date) => {
     // react-big-calendar의 onShowMore는 (events, date) 형식으로 호출됨
-    // events는 해당 날짜에 표시되지 않은 나머지 이벤트들
-    // date는 클릭된 날짜
-    
-    // 같은 날짜의 모든 일정 필터링 (표시된 것 + 표시되지 않은 것 모두 포함)
-    const dateStr = moment(date).format('YYYY-MM-DD')
-    const sameDateEvents = filteredEvents.filter(event => {
-      const eventStart = moment(event.start).format('YYYY-MM-DD')
-      const eventEnd = moment(event.end).format('YYYY-MM-DD')
-      return eventStart <= dateStr && eventEnd >= dateStr
-    })
-    
+    // 여기서 넘어오는 events는 해당 날짜 셀에서 "숨겨진" 일정 목록이므로
+    // 캘린더에 표시되는 내용과 1:1로 정확히 일치함
+    //
+    // 사용자가 기대하는 것은 "+N more"에 해당하는 일정들을
+    // 그대로 모달에서 확인하는 것이므로, 추가 필터링 없이
+    // 전달받은 events 배열을 그대로 사용한다.
+
     setMoreEventsDate(date)
-    setMoreEvents(sameDateEvents)
+    setMoreEvents(events || [])
     setShowMoreEventsModal(true)
   }
 
