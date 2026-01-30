@@ -1,6 +1,6 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
-import { Calendar, Users, LogOut, Menu } from 'lucide-react'
+import { Calendar, Users, LogOut, Menu, Gamepad2 } from 'lucide-react'
 import { useState } from 'react'
 
 function Layout() {
@@ -40,6 +40,17 @@ function Layout() {
               >
                 <Calendar className="w-4 h-4 mr-2" />
                 캘린더
+              </Link>
+              <Link
+                to="/games"
+                className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  isActive('/games')
+                    ? 'bg-primary-100 text-primary-700'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <Gamepad2 className="w-4 h-4 mr-2" />
+                게임
               </Link>
               {user?.role && user.role.toUpperCase() === 'ADMIN' && (
                 <Link
@@ -95,6 +106,18 @@ function Layout() {
               >
                 <Calendar className="w-4 h-4 inline mr-2" />
                 캘린더
+              </Link>
+              <Link
+                to="/games"
+                className={`block px-3 py-2 rounded-md text-base font-medium ${
+                  isActive('/games')
+                    ? 'bg-primary-100 text-primary-700'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <Gamepad2 className="w-4 h-4 inline mr-2" />
+                게임
               </Link>
               {user?.role && user.role.toUpperCase() === 'ADMIN' && (
                 <Link
