@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { RotateCcw, Trophy } from 'lucide-react'
+import { gamesAPI } from '../../api/games'
 
 const GRID_SIZE = 4
 const WINNING_TILE = 2048
@@ -143,26 +144,29 @@ const isGameOver = (grid) => {
   return true
 }
 
-// 최고 점수 가져오기
-const getBestScore = () => {
-  return parseInt(localStorage.getItem('2048_best_score') || '0', 10)
-}
-
-// 최고 점수 저장
-const saveBestScore = (score) => {
-  const best = getBestScore()
-  if (score > best) {
-    localStorage.setItem('2048_best_score', score.toString())
-  }
-}
-
 function Game2048() {
   const [grid, setGrid] = useState(initializeGrid)
   const [score, setScore] = useState(0)
-  const [bestScore, setBestScore] = useState(getBestScore())
+  const [bestScore, setBestScore] = useState(0)
   const [gameOver, setGameOver] = useState(false)
   const [won, setWon] = useState(false)
   const touchStartRef = useRef(null)
+  const previousScoreRef = useRef(0)
+
+  // 최고 기록 로드
+  useEffect(() => {
+    const loadBestScore = async () => {
+      try {
+        const result = await gamesAPI.getMyBestScore('GAME_2048')
+        if (result.score) {
+          setBestScore(result.score.score)
+        }
+      } catch (error) {
+        console.error('최고 기록 로드 실패:', error)
+      }
+    }
+    loadBestScore()
+  }, [])
 
   // 점수 계산
   useEffect(() => {
@@ -173,8 +177,23 @@ function Game2048() {
       }
     }
     setScore(total)
-    saveBestScore(total)
-    setBestScore(getBestScore())
+    
+    // 점수가 증가했을 때만 서버에 저장 시도
+    if (total > previousScoreRef.current) {
+      previousScoreRef.current = total
+      // 최고 기록 갱신 시 서버에 저장
+      if (total > bestScore) {
+        gamesAPI.saveScore('GAME_2048', total)
+          .then((result) => {
+            if (result.score) {
+              setBestScore(result.score.score)
+            }
+          })
+          .catch((error) => {
+            console.error('점수 저장 실패:', error)
+          })
+      }
+    }
     
     // 승리 체크
     if (!won) {
@@ -190,8 +209,20 @@ function Game2048() {
     // 게임 오버 체크
     if (isGameOver(grid)) {
       setGameOver(true)
+      // 게임 오버 시 최종 점수 저장
+      if (total > bestScore) {
+        gamesAPI.saveScore('GAME_2048', total)
+          .then((result) => {
+            if (result.score) {
+              setBestScore(result.score.score)
+            }
+          })
+          .catch((error) => {
+            console.error('점수 저장 실패:', error)
+          })
+      }
     }
-  }, [grid, won])
+  }, [grid, won, bestScore])
 
   const handleMove = useCallback((direction) => {
     if (gameOver) return
@@ -237,6 +268,7 @@ function Game2048() {
   const handleReset = () => {
     setGrid(initializeGrid())
     setScore(0)
+    previousScoreRef.current = 0
     setGameOver(false)
     setWon(false)
   }

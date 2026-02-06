@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { RotateCcw } from 'lucide-react'
+import { gamesAPI } from '../../api/games'
 
 const BOARD_SIZE = 3
 const EMPTY = null
@@ -88,16 +89,29 @@ function TicTacToe() {
   const [isPlayerTurn, setIsPlayerTurn] = useState(true)
   const [winner, setWinner] = useState(null)
   const [score, setScore] = useState({
-    wins: parseInt(localStorage.getItem('tictactoe_wins') || '0', 10),
-    losses: parseInt(localStorage.getItem('tictactoe_losses') || '0', 10),
-    draws: parseInt(localStorage.getItem('tictactoe_draws') || '0', 10),
+    wins: 0,
+    losses: 0,
+    draws: 0,
   })
 
-  const saveScore = (newScore) => {
-    localStorage.setItem('tictactoe_wins', newScore.wins.toString())
-    localStorage.setItem('tictactoe_losses', newScore.losses.toString())
-    localStorage.setItem('tictactoe_draws', newScore.draws.toString())
-  }
+  // 최고 기록 로드
+  useEffect(() => {
+    const loadBestScore = async () => {
+      try {
+        const result = await gamesAPI.getMyBestScore('TIC_TAC_TOE')
+        if (result.score && result.score.metadata) {
+          setScore({
+            wins: result.score.metadata.wins || 0,
+            losses: result.score.metadata.losses || 0,
+            draws: result.score.metadata.draws || 0,
+          })
+        }
+      } catch (error) {
+        console.error('최고 기록 로드 실패:', error)
+      }
+    }
+    loadBestScore()
+  }, [])
 
   // 컴퓨터 턴
   useEffect(() => {
@@ -126,7 +140,21 @@ function TicTacToe() {
           losses: prev.losses + (gameWinner === COMPUTER ? 1 : 0),
           draws: prev.draws,
         }
-        saveScore(newScore)
+        
+        // 승률 계산 및 서버에 저장
+        const total = newScore.wins + newScore.losses + newScore.draws
+        if (total > 0) {
+          const winRate = newScore.wins / total
+          gamesAPI.saveScore('TIC_TAC_TOE', winRate, {
+            wins: newScore.wins,
+            losses: newScore.losses,
+            draws: newScore.draws,
+            total,
+          }).catch((error) => {
+            console.error('점수 저장 실패:', error)
+          })
+        }
+        
         return newScore
       })
     } else if (!board.includes(EMPTY) && !gameWinner) {
@@ -136,7 +164,21 @@ function TicTacToe() {
           ...prev,
           draws: prev.draws + 1,
         }
-        saveScore(newScore)
+        
+        // 승률 계산 및 서버에 저장
+        const total = newScore.wins + newScore.losses + newScore.draws
+        if (total > 0) {
+          const winRate = newScore.wins / total
+          gamesAPI.saveScore('TIC_TAC_TOE', winRate, {
+            wins: newScore.wins,
+            losses: newScore.losses,
+            draws: newScore.draws,
+            total,
+          }).catch((error) => {
+            console.error('점수 저장 실패:', error)
+          })
+        }
+        
         return newScore
       })
     }
@@ -159,7 +201,15 @@ function TicTacToe() {
 
   const resetScore = () => {
     setScore({ wins: 0, losses: 0, draws: 0 })
-    saveScore({ wins: 0, losses: 0, draws: 0 })
+    // 리셋 시 서버에도 저장
+    gamesAPI.saveScore('TIC_TAC_TOE', 0, {
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      total: 0,
+    }).catch((error) => {
+      console.error('점수 저장 실패:', error)
+    })
   }
 
   return (
