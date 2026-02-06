@@ -17,6 +17,7 @@ function SnakeGame() {
   const [gameStarted, setGameStarted] = useState(false)
   const directionRef = useRef(INITIAL_DIRECTION)
   const gameLoopRef = useRef(null)
+  const touchStartRef = useRef(null)
 
   const getBestScore = () => {
     return parseInt(localStorage.getItem('snake_best_score') || '0', 10)
@@ -179,6 +180,71 @@ function SnakeGame() {
     setGameStarted(false)
   }
 
+  // 방향 변경 함수
+  const changeDirection = useCallback((newDirection) => {
+    if (!gameStarted || gameOver) return
+    
+    const currentDir = directionRef.current
+    
+    // 반대 방향으로는 이동 불가
+    if (
+      (newDirection.x === -currentDir.x && newDirection.x !== 0) ||
+      (newDirection.y === -currentDir.y && newDirection.y !== 0)
+    ) {
+      return
+    }
+    
+    // 수직/수평 방향만 변경 가능
+    if (
+      (currentDir.x === 0 && newDirection.x !== 0) ||
+      (currentDir.y === 0 && newDirection.y !== 0)
+    ) {
+      directionRef.current = newDirection
+      setDirection(newDirection)
+    }
+  }, [gameStarted, gameOver])
+
+  // 터치 이벤트 핸들러 (스와이프 제스처)
+  const handleTouchStart = (e) => {
+    if (!gameStarted || gameOver) return
+    const touch = e.touches[0]
+    touchStartRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+    }
+  }
+
+  const handleTouchEnd = (e) => {
+    if (!touchStartRef.current || !gameStarted || gameOver) return
+
+    const touch = e.changedTouches[0]
+    const deltaX = touch.clientX - touchStartRef.current.x
+    const deltaY = touch.clientY - touchStartRef.current.y
+    const minSwipeDistance = 30
+
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      // 수평 스와이프
+      if (Math.abs(deltaX) > minSwipeDistance) {
+        if (deltaX > 0) {
+          changeDirection({ x: 1, y: 0 })
+        } else {
+          changeDirection({ x: -1, y: 0 })
+        }
+      }
+    } else {
+      // 수직 스와이프
+      if (Math.abs(deltaY) > minSwipeDistance) {
+        if (deltaY > 0) {
+          changeDirection({ x: 0, y: 1 })
+        } else {
+          changeDirection({ x: 0, y: -1 })
+        }
+      }
+    }
+
+    touchStartRef.current = null
+  }
+
   return (
     <div className="flex flex-col items-center">
       {/* 점수 표시 */}
@@ -194,7 +260,11 @@ function SnakeGame() {
       </div>
 
       {/* 게임 보드 */}
-      <div className="relative bg-gray-900 p-2 rounded-lg mb-4">
+      <div 
+        className="relative bg-gray-900 p-2 rounded-lg mb-4 touch-none"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         <div
           style={{
             width: GRID_SIZE * CELL_SIZE,
@@ -282,68 +352,20 @@ function SnakeGame() {
         </button>
       </div>
 
-      {/* 모바일 컨트롤 */}
+      {/* 모바일 컨트롤 버튼 (선택사항) */}
       {gameStarted && !gameOver && (
-        <div className="grid grid-cols-3 gap-2 max-w-xs mb-4">
-          <div></div>
-          <button
-            onClick={() => {
-              if (directionRef.current.y === 0) {
-                directionRef.current = { x: 0, y: -1 }
-                setDirection({ x: 0, y: -1 })
-              }
-            }}
-            className="p-4 bg-gray-200 rounded hover:bg-gray-300"
-          >
-            ↑
-          </button>
-          <div></div>
-          <button
-            onClick={() => {
-              if (directionRef.current.x === 0) {
-                directionRef.current = { x: -1, y: 0 }
-                setDirection({ x: -1, y: 0 })
-              }
-            }}
-            className="p-4 bg-gray-200 rounded hover:bg-gray-300"
-          >
-            ←
-          </button>
+        <div className="flex flex-col items-center gap-2 mb-4">
           <button
             onClick={() => setIsPaused(prev => !prev)}
-            className="p-4 bg-gray-200 rounded hover:bg-gray-300"
+            className="px-6 py-3 bg-gray-200 rounded hover:bg-gray-300 text-sm font-semibold"
           >
-            ⏸
+            {isPaused ? '▶ 재개' : '⏸ 일시정지'}
           </button>
-          <button
-            onClick={() => {
-              if (directionRef.current.x === 0) {
-                directionRef.current = { x: 1, y: 0 }
-                setDirection({ x: 1, y: 0 })
-              }
-            }}
-            className="p-4 bg-gray-200 rounded hover:bg-gray-300"
-          >
-            →
-          </button>
-          <div></div>
-          <button
-            onClick={() => {
-              if (directionRef.current.y === 0) {
-                directionRef.current = { x: 0, y: 1 }
-                setDirection({ x: 0, y: 1 })
-              }
-            }}
-            className="p-4 bg-gray-200 rounded hover:bg-gray-300"
-          >
-            ↓
-          </button>
-          <div></div>
         </div>
       )}
 
       <p className="text-sm text-gray-600 text-center">
-        화살표 키로 이동하세요. 스페이스바로 일시정지
+        화살표 키 또는 스와이프로 이동하세요. 스페이스바로 일시정지
       </p>
     </div>
   )
