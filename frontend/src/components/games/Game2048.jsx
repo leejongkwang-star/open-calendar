@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { RotateCcw, Trophy } from 'lucide-react'
 
 const GRID_SIZE = 4
@@ -162,6 +162,7 @@ function Game2048() {
   const [bestScore, setBestScore] = useState(getBestScore())
   const [gameOver, setGameOver] = useState(false)
   const [won, setWon] = useState(false)
+  const touchStartRef = useRef(null)
 
   // 점수 계산
   useEffect(() => {
@@ -240,6 +241,46 @@ function Game2048() {
     setWon(false)
   }
 
+  // 터치 이벤트 핸들러 (스와이프 제스처)
+  const handleTouchStart = (e) => {
+    const touch = e.touches[0]
+    touchStartRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+    }
+  }
+
+  const handleTouchEnd = (e) => {
+    if (!touchStartRef.current || gameOver) return
+
+    const touch = e.changedTouches[0]
+    const deltaX = touch.clientX - touchStartRef.current.x
+    const deltaY = touch.clientY - touchStartRef.current.y
+    const minSwipeDistance = 30
+
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      // 수평 스와이프
+      if (Math.abs(deltaX) > minSwipeDistance) {
+        if (deltaX > 0) {
+          handleMove('right')
+        } else {
+          handleMove('left')
+        }
+      }
+    } else {
+      // 수직 스와이프
+      if (Math.abs(deltaY) > minSwipeDistance) {
+        if (deltaY > 0) {
+          handleMove('down')
+        } else {
+          handleMove('up')
+        }
+      }
+    }
+
+    touchStartRef.current = null
+  }
+
   const getTileColor = (value) => {
     const colors = {
       0: 'bg-gray-200',
@@ -273,7 +314,11 @@ function Game2048() {
       </div>
 
       {/* 게임 보드 */}
-      <div className="bg-gray-300 p-2 rounded-lg mb-4">
+      <div 
+        className="bg-gray-300 p-2 rounded-lg mb-4 touch-none"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         <div className="grid grid-cols-4 gap-2">
           {grid.map((row, i) =>
             row.map((cell, j) => (
@@ -346,7 +391,7 @@ function Game2048() {
       </div>
 
       <p className="text-sm text-gray-600 mt-4 text-center">
-        화살표 키 또는 버튼을 사용하여 타일을 이동하세요
+        화살표 키, 버튼, 또는 스와이프로 타일을 이동하세요
       </p>
     </div>
   )

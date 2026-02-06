@@ -113,6 +113,8 @@ function Tetris() {
   const [gameStarted, setGameStarted] = useState(false)
   const gameLoopRef = useRef(null)
   const dropTimeRef = useRef(Date.now())
+  const touchStartRef = useRef(null)
+  const lastTapRef = useRef(0)
 
   const getBestScore = () => {
     return parseInt(localStorage.getItem('tetris_best_score') || '0', 10)
@@ -273,6 +275,66 @@ function Tetris() {
 
   const displayBoard = currentPiece ? placePiece(board, currentPiece) : board
 
+  // 터치 이벤트 핸들러 (스와이프 제스처 및 더블 탭)
+  const handleTouchStart = (e) => {
+    if (!gameStarted || gameOver) return
+    const touch = e.touches[0]
+    touchStartRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      time: Date.now(),
+    }
+  }
+
+  const handleTouchEnd = (e) => {
+    if (!touchStartRef.current || !gameStarted || gameOver) return
+
+    const touch = e.changedTouches[0]
+    const deltaX = touch.clientX - touchStartRef.current.x
+    const deltaY = touch.clientY - touchStartRef.current.y
+    const deltaTime = Date.now() - touchStartRef.current.time
+    const minSwipeDistance = 30
+    const maxTapTime = 300
+
+    // 더블 탭 감지 (회전)
+    const now = Date.now()
+    if (deltaTime < maxTapTime && Math.abs(deltaX) < 10 && Math.abs(deltaY) < 10) {
+      if (now - lastTapRef.current < 300) {
+        rotatePiece()
+        lastTapRef.current = 0
+        touchStartRef.current = null
+        return
+      }
+      lastTapRef.current = now
+      touchStartRef.current = null
+      return
+    }
+
+    // 스와이프 감지
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      // 수평 스와이프
+      if (Math.abs(deltaX) > minSwipeDistance) {
+        if (deltaX > 0) {
+          movePiece(1, 0)
+        } else {
+          movePiece(-1, 0)
+        }
+      }
+    } else {
+      // 수직 스와이프
+      if (Math.abs(deltaY) > minSwipeDistance) {
+        if (deltaY > 0) {
+          dropPiece()
+        } else {
+          // 위로 스와이프는 회전
+          rotatePiece()
+        }
+      }
+    }
+
+    touchStartRef.current = null
+  }
+
   return (
     <div className="flex flex-col items-center">
       <h2 className="text-2xl font-bold mb-6">테트리스</h2>
@@ -281,11 +343,13 @@ function Tetris() {
         {/* 게임 보드 */}
         <div className="relative">
           <div
-            className="bg-gray-900 p-2 rounded-lg"
+            className="bg-gray-900 p-2 rounded-lg touch-none"
             style={{
               width: BOARD_WIDTH * CELL_SIZE + 4,
               height: BOARD_HEIGHT * CELL_SIZE + 4,
             }}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
           >
             <div className="grid" style={{ gridTemplateColumns: `repeat(${BOARD_WIDTH}, ${CELL_SIZE}px)` }}>
               {displayBoard.map((row, y) =>
@@ -377,48 +441,28 @@ function Tetris() {
         </button>
       </div>
 
-      {/* 모바일 컨트롤 */}
+      {/* 모바일 컨트롤 버튼 (선택사항) */}
       {gameStarted && !gameOver && (
-        <div className="grid grid-cols-3 gap-2 max-w-xs mb-4">
-          <div></div>
-          <button
-            onClick={rotatePiece}
-            className="p-4 bg-gray-200 rounded hover:bg-gray-300"
-          >
-            ↻
-          </button>
-          <div></div>
-          <button
-            onClick={() => movePiece(-1, 0)}
-            className="p-4 bg-gray-200 rounded hover:bg-gray-300"
-          >
-            ←
-          </button>
-          <button
-            onClick={() => setIsPaused(prev => !prev)}
-            className="p-4 bg-gray-200 rounded hover:bg-gray-300"
-          >
-            ⏸
-          </button>
-          <button
-            onClick={() => movePiece(1, 0)}
-            className="p-4 bg-gray-200 rounded hover:bg-gray-300"
-          >
-            →
-          </button>
-          <div></div>
-          <button
-            onClick={dropPiece}
-            className="p-4 bg-gray-200 rounded hover:bg-gray-300"
-          >
-            ↓
-          </button>
-          <div></div>
+        <div className="flex flex-col items-center gap-2 mb-4">
+          <div className="flex gap-2">
+            <button
+              onClick={rotatePiece}
+              className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 text-sm font-semibold"
+            >
+              ↻ 회전
+            </button>
+            <button
+              onClick={() => setIsPaused(prev => !prev)}
+              className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 text-sm font-semibold"
+            >
+              {isPaused ? '▶ 재개' : '⏸ 일시정지'}
+            </button>
+          </div>
         </div>
       )}
 
       <p className="text-sm text-gray-600 text-center">
-        화살표 키로 이동/회전, 스페이스바로 일시정지
+        화살표 키 또는 스와이프로 이동/회전, 더블 탭으로 회전, 스페이스바로 일시정지
       </p>
     </div>
   )
