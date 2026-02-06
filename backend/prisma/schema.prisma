@@ -30,6 +30,7 @@ model User {
   teams           TeamMember[]
   events          Event[]
   createdTeams    Team[]    @relation("TeamCreator")
+  gameScores      GameScore[]
 
   @@index([employeeNumber])
   @@index([status])
@@ -125,5 +126,34 @@ enum EventType {
   TRAINING      // 연수
   BUSINESS_TRIP // 출장
   OTHER         // 기타
+}
+
+// 게임 타입 enum
+enum GameType {
+  GAME_2048
+  SNAKE
+  TETRIS
+  REACTION
+  ROCK_PAPER_SCISSORS
+  TIC_TAC_TOE
+  SUDOKU
+}
+
+// 게임 점수 모델
+model GameScore {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  gameType  GameType
+  score     Float
+  metadata  Json?    // 게임별 추가 정보 (난이도, 클리어 시간 등)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, gameType]) // 사용자당 게임별 최고 기록만 유지
+  @@index([gameType, score])
+  @@index([userId])
+  @@map("game_scores")
 }
 

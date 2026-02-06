@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { RotateCcw, Zap } from 'lucide-react'
+import { gamesAPI } from '../../api/games'
 
 function ReactionTest() {
   const [waiting, setWaiting] = useState(false)
@@ -11,19 +12,22 @@ function ReactionTest() {
   const timeoutRef = useRef(null)
   const startTimeRef = useRef(null)
 
-  const getBestTime = () => {
-    const saved = localStorage.getItem('reaction_best_time')
-    return saved ? parseFloat(saved) : null
-  }
+  const [bestTime, setBestTime] = useState(null)
 
-  const saveBestTime = (time) => {
-    const best = getBestTime()
-    if (!best || time < best) {
-      localStorage.setItem('reaction_best_time', time.toString())
+  // 최고 기록 로드
+  useEffect(() => {
+    const loadBestTime = async () => {
+      try {
+        const result = await gamesAPI.getMyBestScore('REACTION')
+        if (result.score) {
+          setBestTime(result.score.score)
+        }
+      } catch (error) {
+        console.error('최고 기록 로드 실패:', error)
+      }
     }
-  }
-
-  const [bestTime, setBestTime] = useState(getBestTime())
+    loadBestTime()
+  }, [])
 
   const startTest = () => {
     setWaiting(true)
@@ -54,10 +58,21 @@ function ReactionTest() {
     setTimes(prev => {
       const newTimes = [...prev, timeInSeconds]
       if (newTimes.length > 10) newTimes.shift()
-      saveBestTime(timeInSeconds)
-      setBestTime(getBestTime())
       return newTimes
     })
+    
+    // 최고 기록 갱신 시 서버에 저장 (낮을수록 좋음)
+    if (bestTime === null || timeInSeconds < bestTime) {
+      gamesAPI.saveScore('REACTION', timeInSeconds)
+        .then((result) => {
+          if (result.score) {
+            setBestTime(result.score.score)
+          }
+        })
+        .catch((error) => {
+          console.error('점수 저장 실패:', error)
+        })
+    }
   }
 
   const reset = () => {

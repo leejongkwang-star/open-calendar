@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { RotateCcw, Trophy } from 'lucide-react'
+import { gamesAPI } from '../../api/games'
 
 const CHOICES = [
   { id: 'rock', name: '바위', emoji: '✊' },
@@ -24,16 +25,29 @@ function RockPaperScissors() {
   const [computerChoice, setComputerChoice] = useState(null)
   const [result, setResult] = useState(null)
   const [score, setScore] = useState({
-    wins: parseInt(localStorage.getItem('rps_wins') || '0', 10),
-    losses: parseInt(localStorage.getItem('rps_losses') || '0', 10),
-    draws: parseInt(localStorage.getItem('rps_draws') || '0', 10),
+    wins: 0,
+    losses: 0,
+    draws: 0,
   })
 
-  const saveScore = (newScore) => {
-    localStorage.setItem('rps_wins', newScore.wins.toString())
-    localStorage.setItem('rps_losses', newScore.losses.toString())
-    localStorage.setItem('rps_draws', newScore.draws.toString())
-  }
+  // 최고 기록 로드
+  useEffect(() => {
+    const loadBestScore = async () => {
+      try {
+        const result = await gamesAPI.getMyBestScore('ROCK_PAPER_SCISSORS')
+        if (result.score && result.score.metadata) {
+          setScore({
+            wins: result.score.metadata.wins || 0,
+            losses: result.score.metadata.losses || 0,
+            draws: result.score.metadata.draws || 0,
+          })
+        }
+      } catch (error) {
+        console.error('최고 기록 로드 실패:', error)
+      }
+    }
+    loadBestScore()
+  }, [])
 
   const handleChoice = (choiceId) => {
     const computerChoiceId = CHOICES[Math.floor(Math.random() * CHOICES.length)].id
@@ -49,7 +63,21 @@ function RockPaperScissors() {
         losses: prev.losses + (gameResult === 'lose' ? 1 : 0),
         draws: prev.draws + (gameResult === 'draw' ? 1 : 0),
       }
-      saveScore(newScore)
+      
+      // 승률 계산 및 서버에 저장
+      const total = newScore.wins + newScore.losses + newScore.draws
+      if (total > 0) {
+        const winRate = newScore.wins / total
+        gamesAPI.saveScore('ROCK_PAPER_SCISSORS', winRate, {
+          wins: newScore.wins,
+          losses: newScore.losses,
+          draws: newScore.draws,
+          total,
+        }).catch((error) => {
+          console.error('점수 저장 실패:', error)
+        })
+      }
+      
       return newScore
     })
   }
@@ -59,7 +87,15 @@ function RockPaperScissors() {
     setComputerChoice(null)
     setResult(null)
     setScore({ wins: 0, losses: 0, draws: 0 })
-    saveScore({ wins: 0, losses: 0, draws: 0 })
+    // 리셋 시 서버에도 저장
+    gamesAPI.saveScore('ROCK_PAPER_SCISSORS', 0, {
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      total: 0,
+    }).catch((error) => {
+      console.error('점수 저장 실패:', error)
+    })
   }
 
   const getResultMessage = () => {

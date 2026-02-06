@@ -5,6 +5,7 @@ import { PrismaClient } from '@prisma/client'
 import authRoutes from './routes/auth.js'
 import eventsRoutes from './routes/events.js'
 import teamsRoutes from './routes/teams.js'
+import gamesRoutes from './routes/games.js'
 import { errorHandler } from './middleware/errorHandler.js'
 
 // 환경 변수 로드
@@ -126,6 +127,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes)
 app.use('/api/events', eventsRoutes)
 app.use('/api/teams', teamsRoutes)
+app.use('/api/games', gamesRoutes)
 
 // 404 핸들러
 app.use((req, res) => {

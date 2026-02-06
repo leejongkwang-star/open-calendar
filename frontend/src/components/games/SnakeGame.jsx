@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { RotateCcw, Trophy } from 'lucide-react'
+import { gamesAPI } from '../../api/games'
 
 const GRID_SIZE = 20
 const CELL_SIZE = 20
@@ -19,18 +20,22 @@ function SnakeGame() {
   const gameLoopRef = useRef(null)
   const touchStartRef = useRef(null)
 
-  const getBestScore = () => {
-    return parseInt(localStorage.getItem('snake_best_score') || '0', 10)
-  }
+  const [bestScore, setBestScore] = useState(0)
 
-  const saveBestScore = (score) => {
-    const best = getBestScore()
-    if (score > best) {
-      localStorage.setItem('snake_best_score', score.toString())
+  // 최고 기록 로드
+  useEffect(() => {
+    const loadBestScore = async () => {
+      try {
+        const result = await gamesAPI.getMyBestScore('SNAKE')
+        if (result.score) {
+          setBestScore(result.score.score)
+        }
+      } catch (error) {
+        console.error('최고 기록 로드 실패:', error)
+      }
     }
-  }
-
-  const [bestScore, setBestScore] = useState(getBestScore())
+    loadBestScore()
+  }, [])
 
   // 랜덤 음식 생성
   const generateFood = useCallback((snakeBody) => {
@@ -69,8 +74,18 @@ function SnakeGame() {
       // 충돌 체크
       if (checkCollision(head, prevSnake)) {
         setGameOver(true)
-        saveBestScore(score)
-        setBestScore(getBestScore())
+        // 게임 오버 시 점수 저장
+        if (score > bestScore) {
+          gamesAPI.saveScore('SNAKE', score)
+            .then((result) => {
+              if (result.score) {
+                setBestScore(result.score.score)
+              }
+            })
+            .catch((error) => {
+              console.error('점수 저장 실패:', error)
+            })
+        }
         return prevSnake
       }
 
@@ -80,8 +95,18 @@ function SnakeGame() {
       if (head.x === food.x && head.y === food.y) {
         setScore(prev => {
           const newScore = prev + 10
-          saveBestScore(newScore)
-          setBestScore(getBestScore())
+          // 최고 기록 갱신 시 서버에 저장
+          if (newScore > bestScore) {
+            gamesAPI.saveScore('SNAKE', newScore)
+              .then((result) => {
+                if (result.score) {
+                  setBestScore(result.score.score)
+                }
+              })
+              .catch((error) => {
+                console.error('점수 저장 실패:', error)
+              })
+          }
           return newScore
         })
         setFood(generateFood(newSnake))
@@ -91,7 +116,7 @@ function SnakeGame() {
 
       return newSnake
     })
-  }, [food, isPaused, gameOver, gameStarted, checkCollision, generateFood, score])
+  }, [food, isPaused, gameOver, gameStarted, checkCollision, generateFood, score, bestScore])
 
   // 키보드 입력 처리
   const handleKeyPress = useCallback((e) => {

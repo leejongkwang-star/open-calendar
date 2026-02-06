@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { RotateCcw, Trophy } from 'lucide-react'
+import { gamesAPI } from '../../api/games'
 
 const BOARD_WIDTH = 10
 const BOARD_HEIGHT = 20
@@ -116,18 +117,22 @@ function Tetris() {
   const touchStartRef = useRef(null)
   const lastTapRef = useRef(0)
 
-  const getBestScore = () => {
-    return parseInt(localStorage.getItem('tetris_best_score') || '0', 10)
-  }
+  const [bestScore, setBestScore] = useState(0)
 
-  const saveBestScore = (score) => {
-    const best = getBestScore()
-    if (score > best) {
-      localStorage.setItem('tetris_best_score', score.toString())
+  // 최고 기록 로드
+  useEffect(() => {
+    const loadBestScore = async () => {
+      try {
+        const result = await gamesAPI.getMyBestScore('TETRIS')
+        if (result.score) {
+          setBestScore(result.score.score)
+        }
+      } catch (error) {
+        console.error('최고 기록 로드 실패:', error)
+      }
     }
-  }
-
-  const [bestScore, setBestScore] = useState(getBestScore())
+    loadBestScore()
+  }, [])
 
   const spawnPiece = useCallback(() => {
     const shapeIndex = Math.floor(Math.random() * SHAPES.length)
@@ -135,13 +140,23 @@ function Tetris() {
     
     if (!isValidPosition(board, piece)) {
       setGameOver(true)
-      saveBestScore(score)
-      setBestScore(getBestScore())
+      // 게임 오버 시 점수 저장
+      if (score > bestScore) {
+        gamesAPI.saveScore('TETRIS', score)
+          .then((result) => {
+            if (result.score) {
+              setBestScore(result.score.score)
+            }
+          })
+          .catch((error) => {
+            console.error('점수 저장 실패:', error)
+          })
+      }
       return null
     }
     
     return piece
-  }, [board, score])
+  }, [board, score, bestScore])
 
   const movePiece = useCallback((dx, dy) => {
     if (!currentPiece || gameOver || isPaused) return
@@ -179,8 +194,18 @@ function Tetris() {
       })
       setScore(prev => {
         const newScore = prev + linesCleared * 100 * level
-        saveBestScore(newScore)
-        setBestScore(getBestScore())
+        // 최고 기록 갱신 시 서버에 저장
+        if (newScore > bestScore) {
+          gamesAPI.saveScore('TETRIS', newScore)
+            .then((result) => {
+              if (result.score) {
+                setBestScore(result.score.score)
+              }
+            })
+            .catch((error) => {
+              console.error('점수 저장 실패:', error)
+            })
+        }
         return newScore
       })
       
@@ -188,7 +213,7 @@ function Tetris() {
       setCurrentPiece(nextPiece)
       dropTimeRef.current = Date.now()
     }
-  }, [board, currentPiece, gameOver, isPaused, level, spawnPiece, movePiece])
+  }, [board, currentPiece, gameOver, isPaused, level, spawnPiece, movePiece, bestScore])
 
   const handleKeyPress = useCallback((e) => {
     if (!gameStarted || gameOver) return

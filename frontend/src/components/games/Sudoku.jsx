@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { RotateCcw, Check } from 'lucide-react'
+import { gamesAPI } from '../../api/games'
 
 const GRID_SIZE = 4 // 4x4 스도쿠 (간단 버전)
 const BOX_SIZE = 2
@@ -92,6 +93,24 @@ function Sudoku() {
   const [isSolved, setIsSolved] = useState(false)
   const [errors, setErrors] = useState(Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(false)))
   const [showErrors, setShowErrors] = useState(true)
+  const [bestTime, setBestTime] = useState(null)
+  const startTimeRef = useRef(null)
+  const currentDifficultyRef = useRef(null)
+
+  // 최고 기록 로드
+  useEffect(() => {
+    const loadBestTime = async () => {
+      try {
+        const result = await gamesAPI.getMyBestScore('SUDOKU')
+        if (result.score) {
+          setBestTime(result.score.score)
+        }
+      } catch (error) {
+        console.error('최고 기록 로드 실패:', error)
+      }
+    }
+    loadBestTime()
+  }, [])
 
   const initializeGame = (difficulty = 0.5) => {
     const { puzzle: newPuzzle, solution: newSolution } = generatePuzzle(difficulty)
@@ -101,6 +120,8 @@ function Sudoku() {
     setSelectedCell(null)
     setIsSolved(false)
     setErrors(Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(false)))
+    startTimeRef.current = Date.now()
+    currentDifficultyRef.current = difficulty
   }
 
   useEffect(() => {
@@ -132,6 +153,22 @@ function Sudoku() {
     // 해결 여부 체크
     if (checkSolution(newGrid, solution)) {
       setIsSolved(true)
+      // 클리어 시 시간 저장 (낮을수록 좋음)
+      if (startTimeRef.current) {
+        const elapsedTime = (Date.now() - startTimeRef.current) / 1000 // 초 단위
+        if (bestTime === null || elapsedTime < bestTime) {
+          gamesAPI.saveScore('SUDOKU', elapsedTime, {
+            difficulty: currentDifficultyRef.current,
+            time: elapsedTime,
+          }).then((result) => {
+            if (result.score) {
+              setBestTime(result.score.score)
+            }
+          }).catch((error) => {
+            console.error('점수 저장 실패:', error)
+          })
+        }
+      }
     }
   }
 
@@ -168,6 +205,22 @@ function Sudoku() {
     
     if (!hasError && checkSolution(userGrid, solution)) {
       setIsSolved(true)
+      // 클리어 시 시간 저장 (낮을수록 좋음)
+      if (startTimeRef.current) {
+        const elapsedTime = (Date.now() - startTimeRef.current) / 1000 // 초 단위
+        if (bestTime === null || elapsedTime < bestTime) {
+          gamesAPI.saveScore('SUDOKU', elapsedTime, {
+            difficulty: currentDifficultyRef.current,
+            time: elapsedTime,
+          }).then((result) => {
+            if (result.score) {
+              setBestTime(result.score.score)
+            }
+          }).catch((error) => {
+            console.error('점수 저장 실패:', error)
+          })
+        }
+      }
     }
   }
 
