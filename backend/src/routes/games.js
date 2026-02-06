@@ -25,7 +25,10 @@ router.post(
       .isIn(['GAME_2048', 'SNAKE', 'TETRIS', 'REACTION', 'ROCK_PAPER_SCISSORS', 'TIC_TAC_TOE', 'SUDOKU'])
       .withMessage('유효한 게임 타입이 아닙니다.'),
     body('score').isFloat({ min: 0 }).withMessage('점수는 0 이상의 숫자여야 합니다.'),
-    body('metadata').optional().isObject().withMessage('metadata는 객체여야 합니다.'),
+    body('metadata')
+      .optional({ nullable: true })
+      .isObject()
+      .withMessage('metadata는 객체여야 합니다.'),
   ],
   async (req, res, next) => {
     try {
