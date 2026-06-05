@@ -1,0 +1,371 @@
+/* ===========================================================
+   연애의 온도 · 타로 (캘린더앱 통합용 스코프 스타일)
+   모든 규칙을 .tarot-app 아래로 한정해 Tailwind/캘린더 UI와 분리
+   =========================================================== */
+@import url("https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Gowun+Dodum&display=swap");
+
+.tarot-app {
+  /* 팔레트 */
+  --ink: #f4e9e4;
+  --ink-soft: #d9c4bd;
+  --ink-faint: #a98e8a;
+
+  --bg-0: #1b1220;
+  --bg-1: #2a1726;
+  --bg-2: #3a1d2b;
+
+  --rose: #e8a7ad;
+  --rose-deep: #c87a86;
+  --gold: #e4c79b;
+  --gold-soft: #f0dcbf;
+
+  --temp-cold: #7aa7d6;
+  --temp-mid: #e7b27a;
+  --temp-warm: #ec7a8e;
+  --temp-hot: #e85c79;
+
+  --panel: rgba(255, 244, 240, 0.06);
+  --panel-line: rgba(244, 233, 228, 0.14);
+  --shadow: 0 24px 60px -28px rgba(0, 0, 0, 0.7);
+
+  --serif: "Nanum Myeongjo", "Apple SD Gothic Neo", serif;
+  --sans: "Gowun Dodum", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  min-height: 78vh;
+  color: var(--ink);
+  font-family: var(--sans);
+  line-height: 1.7;
+  background: radial-gradient(140% 120% at 50% -10%, var(--bg-2) 0%, var(--bg-1) 42%, var(--bg-0) 100%);
+  -webkit-font-smoothing: antialiased;
+  isolation: isolate;
+}
+
+.tarot-app * { box-sizing: border-box; }
+
+/* 배경의 흐르는 빛 */
+.tarot-app .aurora {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  filter: blur(60px);
+}
+.tarot-app .orb {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.5;
+  mix-blend-mode: screen;
+  animation: tarot-drift 22s var(--ease) infinite alternate;
+}
+.tarot-app .orb--rose { width: 46%; height: 60%; left: -8%; top: -6%;
+  background: radial-gradient(circle, var(--rose) 0%, transparent 68%); }
+.tarot-app .orb--plum { width: 52%; height: 70%; right: -12%; top: 18%;
+  background: radial-gradient(circle, #7e3b63 0%, transparent 70%); animation-delay: -7s; }
+.tarot-app .orb--gold { width: 34%; height: 46%; left: 24%; bottom: -14%;
+  background: radial-gradient(circle, var(--gold) 0%, transparent 70%); opacity: 0.35; animation-delay: -13s; }
+
+@keyframes tarot-drift {
+  from { transform: translate3d(0,0,0) scale(1); }
+  to   { transform: translate3d(3%, 4%, 0) scale(1.12); }
+}
+
+/* 무대 */
+.tarot-app .stage {
+  position: relative;
+  z-index: 2;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: clamp(28px, 5vw, 56px) 20px 56px;
+}
+
+.tarot-app .screen { animation: tarot-rise 0.7s var(--ease) both; }
+@keyframes tarot-rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── 1. 시작 화면 ── */
+.tarot-app .screen--intro { text-align: center; padding-top: clamp(10px, 4vh, 40px); }
+.tarot-app .eyebrow {
+  font-family: var(--serif);
+  letter-spacing: 0.5em; text-indent: 0.5em;
+  font-size: 0.78rem; color: var(--gold); margin: 0 0 14px;
+}
+.tarot-app .title {
+  font-family: var(--serif); font-weight: 800;
+  font-size: clamp(2.6rem, 8vw, 4.6rem); letter-spacing: 0.12em; margin: 0;
+  background: linear-gradient(180deg, var(--gold-soft) 0%, var(--rose) 70%, var(--rose-deep) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  text-shadow: 0 8px 40px rgba(232, 122, 142, 0.18);
+}
+.tarot-app .subtitle {
+  color: var(--ink-soft); font-size: clamp(0.95rem, 2.4vw, 1.06rem);
+  margin: 20px auto 0; max-width: 33ch;
+}
+.tarot-app .ask {
+  margin: clamp(28px, 4vh, 48px) auto 0; max-width: 460px;
+  display: flex; flex-direction: column; gap: 18px;
+}
+.tarot-app .ask__label { font-family: var(--serif); font-size: 1.02rem; color: var(--ink); }
+.tarot-app .ask__input {
+  width: 100%; padding: 15px 18px; border-radius: 14px;
+  border: 1px solid var(--panel-line); background: var(--panel);
+  color: var(--ink); font-family: var(--sans); font-size: 1rem; text-align: center;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+.tarot-app .ask__input::placeholder { color: var(--ink-faint); }
+.tarot-app .ask__input:focus {
+  outline: none; border-color: var(--rose);
+  box-shadow: 0 0 0 4px rgba(232, 167, 173, 0.14);
+}
+
+.tarot-app .spread { display: flex; gap: 12px; }
+.tarot-app .spread__opt {
+  flex: 1; display: flex; flex-direction: column; gap: 4px;
+  padding: 16px 12px; border-radius: 14px;
+  border: 1px solid var(--panel-line); background: var(--panel);
+  color: var(--ink-soft); cursor: pointer; font-family: var(--sans);
+  transition: all 0.3s var(--ease);
+}
+.tarot-app .spread__opt:hover { transform: translateY(-2px); border-color: rgba(232,167,173,0.5); }
+.tarot-app .spread__opt.is-selected {
+  border-color: var(--rose);
+  background: linear-gradient(180deg, rgba(232,167,173,0.18), rgba(232,167,173,0.05));
+  color: var(--ink); box-shadow: 0 10px 30px -16px rgba(232, 122, 142, 0.6);
+}
+.tarot-app .spread__num { font-family: var(--serif); font-size: 1.15rem; font-weight: 700; }
+.tarot-app .spread__desc { font-size: 0.82rem; color: var(--ink-faint); }
+.tarot-app .spread__opt.is-selected .spread__desc { color: var(--rose); }
+
+/* 버튼 */
+.tarot-app .btn {
+  font-family: var(--serif); font-size: 1.02rem; letter-spacing: 0.06em;
+  padding: 14px 30px; border-radius: 999px; border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 0.25s var(--ease), box-shadow 0.25s, opacity 0.25s, background 0.3s;
+}
+.tarot-app .btn--primary {
+  color: #2a1320;
+  background: linear-gradient(135deg, var(--gold-soft), var(--rose) 65%, var(--rose-deep));
+  box-shadow: 0 16px 36px -16px rgba(232, 122, 142, 0.8);
+}
+.tarot-app .btn--primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 22px 44px -16px rgba(232, 122, 142, 0.9); }
+.tarot-app .btn--primary:disabled { opacity: 0.4; cursor: not-allowed; filter: saturate(0.6); }
+.tarot-app .btn--ghost { color: var(--ink-soft); background: transparent; border-color: var(--panel-line); }
+.tarot-app .btn--ghost:hover { color: var(--ink); border-color: var(--rose); }
+
+/* ── 2. 카드 선택(덱) ── */
+.tarot-app .screen--deck { text-align: center; }
+.tarot-app .deck__title { font-family: var(--serif); font-size: clamp(1.4rem, 4vw, 2rem); margin: 0 0 6px; color: var(--ink); }
+.tarot-app .deck__hint { color: var(--gold); margin: 0 0 8px; font-size: 0.95rem; }
+
+.tarot-app .deck {
+  position: relative; height: clamp(320px, 44vh, 430px);
+  margin: clamp(10px, 3vh, 26px) auto 8px;
+  display: flex; justify-content: center; align-items: center;
+}
+
+.tarot-app .cardback {
+  position: absolute;
+  width: clamp(74px, 11vw, 116px); aspect-ratio: 2 / 3;
+  border-radius: 12px; transform-origin: bottom center; cursor: pointer;
+  will-change: transform;
+  transform: translateX(var(--tx, 0)) translateY(var(--ty, 0)) rotate(var(--rot, 0deg));
+  transition: transform 0.5s var(--ease), filter 0.4s, box-shadow 0.4s, opacity 0.5s;
+  background:
+    radial-gradient(120% 90% at 50% 8%, rgba(244, 220, 191, 0.25), transparent 55%),
+    linear-gradient(160deg, #4a2640 0%, #2c1626 60%, #38203a 100%);
+  border: 1px solid rgba(228, 199, 155, 0.4);
+  box-shadow: 0 16px 30px -18px rgba(0, 0, 0, 0.8);
+  padding: 0;
+}
+.tarot-app .cardback::before {
+  content: ""; position: absolute; inset: 7px; border-radius: 8px;
+  border: 1px solid rgba(228, 199, 155, 0.45);
+}
+.tarot-app .cardback::after {
+  content: "\2661"; position: absolute; inset: 0; display: grid; place-items: center;
+  font-size: clamp(1.4rem, 3vw, 2rem); color: rgba(240, 220, 191, 0.55);
+  text-shadow: 0 0 18px rgba(232, 167, 173, 0.5);
+}
+.tarot-app .cardback:hover {
+  filter: brightness(1.2); z-index: 100;
+  transform: translateX(var(--tx, 0)) translateY(calc(var(--ty, 0px) - 22px)) rotate(var(--rot, 0deg)) scale(1.05);
+}
+.tarot-app .cardback.is-picked {
+  z-index: 200;
+  border-color: var(--gold-soft); filter: brightness(1.25);
+  box-shadow: 0 0 0 2px rgba(244, 220, 191, 0.6), 0 20px 40px -16px rgba(232, 122, 142, 0.9);
+  transform: translateX(var(--tx, 0)) translateY(calc(var(--ty, 0px) - 34px)) rotate(var(--rot, 0deg)) scale(1.06);
+}
+/* 딜 애니메이션 중에만 카드별 지연 적용(이후 hover 즉시 반응) */
+.tarot-app .deck.is-dealing .cardback { transition-delay: var(--delay, 0ms); }
+/* 딜 전: 가운데 모여 숨은 상태 */
+.tarot-app .deck.is-stacked .cardback {
+  opacity: 0;
+  transform: translateY(40px) scale(0.6) rotate(0deg);
+}
+
+.tarot-app .deck__actions { display: flex; justify-content: center; gap: 14px; margin-top: 10px; }
+
+/* ── 모바일: 가로 스크롤 카드 줄 (탭으로 선택) ── */
+.tarot-app .deck--strip {
+  position: relative;
+  height: auto;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 30px 18px 24px;
+  margin: 8px -18px 0;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  /* 양쪽 가장자리를 살짝 페이드해 더 넘길 수 있음을 암시 */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 6%, #000 94%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 6%, #000 94%, transparent 100%);
+}
+.tarot-app .deck--strip::-webkit-scrollbar { display: none; }
+
+.tarot-app .cardstrip {
+  position: relative;
+  flex: 0 0 auto;
+  width: clamp(124px, 42vw, 158px);
+  aspect-ratio: 2 / 3;
+  scroll-snap-align: center;
+  border-radius: 14px;
+  cursor: pointer;
+  padding: 0;
+  background:
+    radial-gradient(120% 90% at 50% 8%, rgba(244, 220, 191, 0.25), transparent 55%),
+    linear-gradient(160deg, #4a2640 0%, #2c1626 60%, #38203a 100%);
+  border: 1px solid rgba(228, 199, 155, 0.4);
+  box-shadow: 0 16px 30px -18px rgba(0, 0, 0, 0.8);
+  transition: transform 0.3s var(--ease), box-shadow 0.3s, filter 0.3s, border-color 0.3s;
+  animation: tarot-fade 0.5s var(--ease) both;
+  animation-delay: var(--delay, 0ms);
+}
+.tarot-app .cardstrip::before {
+  content: ""; position: absolute; inset: 8px; border-radius: 9px;
+  border: 1px solid rgba(228, 199, 155, 0.45);
+}
+.tarot-app .cardstrip::after {
+  content: "\2661"; position: absolute; inset: 0; display: grid; place-items: center;
+  font-size: 2.1rem; color: rgba(240, 220, 191, 0.55);
+  text-shadow: 0 0 18px rgba(232, 167, 173, 0.5);
+}
+.tarot-app .cardstrip.is-picked {
+  transform: translateY(-12px) scale(1.05);
+  border-color: var(--gold-soft);
+  filter: brightness(1.22);
+  box-shadow: 0 0 0 2px rgba(244, 220, 191, 0.6), 0 22px 42px -16px rgba(232, 122, 142, 0.9);
+}
+@keyframes tarot-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* 모바일 터치 시 파란 하이라이트 제거 */
+.tarot-app button { -webkit-tap-highlight-color: transparent; }
+
+/* ── 3. 결과(리딩) ── */
+.tarot-app .reading__head { text-align: center; margin-bottom: clamp(20px, 4vh, 36px); }
+.tarot-app .reading__q {
+  font-family: var(--serif); font-size: clamp(1.1rem, 3.4vw, 1.5rem);
+  color: var(--ink); margin: 0 auto 18px; max-width: 30ch;
+}
+.tarot-app .reading__q::before { content: "\201C"; color: var(--gold); }
+.tarot-app .reading__q::after { content: "\201D"; color: var(--gold); }
+
+.tarot-app .reading__summary {
+  max-width: 620px; margin: 0 auto; padding: 22px 26px; border-radius: 20px;
+  background: var(--panel); border: 1px solid var(--panel-line); box-shadow: var(--shadow);
+}
+.tarot-app .summary__top { display: flex; align-items: baseline; justify-content: center; gap: 12px; flex-wrap: wrap; }
+.tarot-app .summary__label { color: var(--ink-soft); font-family: var(--serif); }
+.tarot-app .summary__temp { font-family: var(--serif); font-weight: 800; font-size: clamp(2rem, 7vw, 3rem); letter-spacing: 0.02em; }
+.tarot-app .summary__verdict { color: var(--gold); font-family: var(--serif); font-size: 1.05rem; }
+.tarot-app .summary__text { color: var(--ink-soft); margin: 12px 0 0; font-size: 0.98rem; }
+
+.tarot-app .reading__cards {
+  display: grid; gap: clamp(20px, 3vw, 30px);
+  margin: clamp(24px, 4vh, 40px) 0; grid-template-columns: 1fr;
+}
+.tarot-app .reading__cards.is-three { grid-template-columns: repeat(3, 1fr); }
+
+.tarot-app .result {
+  background: var(--panel); border: 1px solid var(--panel-line); border-radius: 22px;
+  padding: 20px; box-shadow: var(--shadow);
+  display: flex; flex-direction: column; gap: 16px;
+  animation: tarot-rise 0.7s var(--ease) both;
+}
+.tarot-app .reading__cards.is-three .result { padding: 16px; }
+.tarot-app .result__pos { text-align: center; font-family: var(--serif); color: var(--gold); letter-spacing: 0.18em; font-size: 0.82rem; }
+
+.tarot-app .flip { perspective: 1200px; width: 100%; max-width: 280px; margin: 0 auto; }
+.tarot-app .reading__cards.is-three .flip { max-width: 100%; }
+.tarot-app .flip__inner {
+  position: relative; width: 100%; aspect-ratio: 426 / 681;
+  transform-style: preserve-3d; transition: transform 0.9s var(--ease);
+}
+.tarot-app .flip.is-flipped .flip__inner { transform: rotateY(180deg); }
+.tarot-app .flip__face {
+  position: absolute; inset: 0; border-radius: 14px;
+  backface-visibility: hidden; overflow: hidden;
+  box-shadow: 0 18px 36px -18px rgba(0, 0, 0, 0.8);
+}
+.tarot-app .flip__face--back {
+  background:
+    radial-gradient(120% 90% at 50% 8%, rgba(244, 220, 191, 0.25), transparent 55%),
+    linear-gradient(160deg, #4a2640 0%, #2c1626 60%, #38203a 100%);
+  border: 1px solid rgba(228, 199, 155, 0.4); display: grid; place-items: center;
+}
+.tarot-app .flip__face--back::after { content: "\2661"; font-size: 2rem; color: rgba(240, 220, 191, 0.55); }
+.tarot-app .flip__face--front { transform: rotateY(180deg); border: 1px solid rgba(228, 199, 155, 0.35); }
+.tarot-app .flip__face--front img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.tarot-app .result__title { font-family: var(--serif); font-weight: 700; font-size: 1.3rem; text-align: center; margin: 0; color: var(--ink); }
+
+.tarot-app .gauge { display: flex; flex-direction: column; gap: 6px; }
+.tarot-app .gauge__head { display: flex; justify-content: space-between; align-items: baseline; }
+.tarot-app .gauge__cap { font-size: 0.78rem; color: var(--ink-faint); }
+.tarot-app .gauge__val { font-family: var(--serif); font-weight: 700; font-size: 1.1rem; }
+.tarot-app .gauge__track {
+  position: relative; height: 9px; border-radius: 999px; opacity: 0.85;
+  background: linear-gradient(90deg, var(--temp-cold), var(--temp-mid) 55%, var(--temp-warm) 80%, var(--temp-hot));
+}
+.tarot-app .gauge__mark {
+  position: absolute; top: 50%; width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; border: 3px solid var(--rose-deep);
+  transform: translate(-50%, -50%); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+  transition: left 1s var(--ease);
+}
+
+.tarot-app .result__keywords { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.tarot-app .kw {
+  font-size: 0.76rem; padding: 5px 12px; border-radius: 999px;
+  background: rgba(232, 167, 173, 0.12); border: 1px solid rgba(232, 167, 173, 0.28); color: var(--rose);
+}
+
+.tarot-app .result__block { display: flex; flex-direction: column; gap: 4px; }
+.tarot-app .result__block h4 { margin: 0; font-family: var(--serif); font-size: 0.86rem; color: var(--gold); letter-spacing: 0.04em; }
+.tarot-app .result__block p { margin: 0; color: var(--ink-soft); font-size: 0.92rem; }
+.tarot-app .result__story { font-size: 0.9rem; color: var(--ink-soft); margin: 0; }
+
+.tarot-app .reading__actions { text-align: center; }
+.tarot-app .reading__foot {
+  text-align: center; color: var(--ink-faint); font-family: var(--serif);
+  font-size: 0.8rem; letter-spacing: 0.18em; margin-top: 30px;
+}
+
+@media (max-width: 720px) {
+  .tarot-app .reading__cards.is-three { grid-template-columns: 1fr; }
+  .tarot-app .reading__cards.is-three .flip { max-width: 260px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tarot-app .orb { animation: none; }
+  .tarot-app *, .tarot-app *::before, .tarot-app *::after { transition-duration: 0.001ms !important; }
+}

@@ -6,6 +6,7 @@ import CalendarPage from './pages/CalendarPage'
 import AdminPage from './pages/AdminPage'
 import LunchLotteryPage from './pages/LunchLotteryPage'
 import GamesPage from './pages/GamesPage'
+import TarotPage from './pages/TarotPage'
 import Layout from './components/Layout'
 
 function PrivateRoute({ children }) {
@@ -32,6 +33,7 @@ function App() {
           <Route path="admin" element={<AdminPage />} />
           <Route path="lunch-lottery" element={<LunchLotteryPage />} />
           <Route path="games" element={<GamesPage />} />
+          <Route path="tarot" element={<TarotPage />} />
         </Route>
       </Routes>
     </Router>
