@@ -12,10 +12,77 @@ import EventModal from '../components/EventModal'
 import EventPopup from '../components/EventPopup'
 import FilterPanel from '../components/FilterPanel'
 import { toKoreanEventType } from '../utils/eventTypeMapping'
+import { formatDisplayTitle, getTitleContent } from '../utils/titleUtils'
 
 // moment를 사용한 로컬라이저
 moment.locale('ko')
 const localizer = momentLocalizer(moment)
+
+// 반복 일정 안전 상한 (한 번에 생성 가능한 최대 개수)
+const MAX_RECURRENCE = 366
+
+const toLocalDateStr = (d) => {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+const addRecurrenceUnit = (dateStr, type, n) => {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const dt = new Date(y, m - 1, d)
+  if (type === 'WEEKLY') dt.setDate(dt.getDate() + 7 * n)
+  else if (type === 'MONTHLY') dt.setMonth(dt.getMonth() + n)
+  else if (type === 'YEARLY') dt.setFullYear(dt.getFullYear() + n)
+  return dt
+}
+
+const diffDays = (startStr, endStr) => {
+  const [sy, sm, sd] = startStr.split('-').map(Number)
+  const [ey, em, ed] = endStr.split('-').map(Number)
+  const s = new Date(sy, sm - 1, sd)
+  const e = new Date(ey, em - 1, ed)
+  return Math.round((e - s) / 86400000)
+}
+
+// 반복 규칙에 따라 각 발생일의 시작/종료 일시 문자열("YYYY-MM-DDTHH:mm") 목록을 생성
+function buildRecurrenceOccurrences(startDate, endDate, startTime, endTime, recurrence) {
+  const { type, endMode, count, until } = recurrence
+  const spanDays = Math.max(0, diffDays(startDate, endDate))
+  const st = startTime || '00:00'
+  const et = endTime || '00:00'
+  const occurrences = []
+
+  const pushOccurrence = (occStartDt) => {
+    const occStartStr = toLocalDateStr(occStartDt)
+    const occEndDt = new Date(occStartDt)
+    occEndDt.setDate(occEndDt.getDate() + spanDays)
+    const occEndStr = toLocalDateStr(occEndDt)
+    occurrences.push({
+      startDateTime: `${occStartStr}T${st}`,
+      endDateTime: `${occEndStr}T${et}`,
+    })
+  }
+
+  if (endMode === 'until' && until) {
+    for (let i = 0; i < MAX_RECURRENCE; i++) {
+      const occStartDt = addRecurrenceUnit(startDate, type, i)
+      if (toLocalDateStr(occStartDt) > until) break
+      pushOccurrence(occStartDt)
+    }
+  } else {
+    const total = Math.min(Math.max(1, Number(count) || 1), MAX_RECURRENCE)
+    for (let i = 0; i < total; i++) {
+      pushOccurrence(addRecurrenceUnit(startDate, type, i))
+    }
+  }
+
+  // 최소 1개는 생성되도록 보장
+  if (occurrences.length === 0) {
+    pushOccurrence(addRecurrenceUnit(startDate, type, 0))
+  }
+  return occurrences
+}
 
 function CalendarPage() {
   const { user, isAuthenticated } = useAuthStore()
@@ -35,6 +102,8 @@ function CalendarPage() {
   const [showMoreEventsModal, setShowMoreEventsModal] = useState(false)
   const [moreEventsDate, setMoreEventsDate] = useState(null)
   const [moreEvents, setMoreEvents] = useState([])
+  // 반복 일정 수정/삭제 범위 선택 프롬프트 { action: 'edit'|'delete', payload, eventId, label }
+  const [recurrencePrompt, setRecurrencePrompt] = useState(null)
   const [filters, setFilters] = useState({
     members: [],
     eventTypes: ['VACATION', 'MEETING', 'TRAINING', 'BUSINESS_TRIP', 'OTHER'],
@@ -85,7 +154,7 @@ function CalendarPage() {
       // 이벤트 요소를 찾아서 위치 계산
       // setTimeout을 사용하여 DOM이 렌더링된 후 찾기
       setTimeout(() => {
-        const eventTitle = event.title?.replace(/\s*\([^)]+\)\s*$/, '') || event.title || ''
+        const eventTitle = getTitleContent(event.title) || event.title || ''
         const eventElements = document.querySelectorAll('.rbc-event')
         
         eventElements.forEach(el => {
@@ -237,7 +306,7 @@ function CalendarPage() {
     }
     
     // 일정 정보로 기본 메시지 템플릿 생성
-    const eventTitle = popupEvent.title || '일정'
+    const eventTitle = getTitleContent(popupEvent.title) || popupEvent.title || '일정'
     const eventDate = popupEvent.startDate 
       ? new Date(popupEvent.startDate).toLocaleDateString('ko-KR', { 
           year: 'numeric', 
@@ -735,6 +804,7 @@ function CalendarPage() {
       const startDateTime = `${startDate}T${startTime || '00:00'}`
       const endDateTime = `${endDate}T${endTime || '00:00'}`
       
+      // 제목은 EventModal에서 이미 "(이름) 내용" 형태로 조합되어 전달됨
       const finalEventData = {
         ...eventData,
         startDate: startDateTime,
@@ -743,17 +813,31 @@ function CalendarPage() {
         endTime: null, // endTime은 null로 전송 (endDate에 시간 포함)
         teamId: teamId, // teamId 명시적으로 포함
       }
-      
+      // recurrence는 별도로 처리하므로 페이로드에서 제외
+      delete finalEventData.recurrence
+
       if (selectedEvent?.id) {
-        // 수정 시: 제목에서 사용자 이름 부분 제거
-        const cleanTitle = eventData.title.replace(/\s*\([^)]+\)\s*$/, '').trim()
-        await eventsAPI.updateEvent(selectedEvent.id, { ...finalEventData, title: cleanTitle })
+        // 수정: 반복 일정이면 범위(이 일정만/전체) 선택 프롬프트 표시
+        if (selectedEvent.recurrenceGroupId) {
+          setRecurrencePrompt({ action: 'edit', payload: finalEventData, eventId: selectedEvent.id })
+          return
+        }
+        await eventsAPI.updateEvent(selectedEvent.id, finalEventData)
+      } else if (eventData.recurrence) {
+        // 신규 + 반복: 반복 일정 일괄 생성
+        const occurrences = buildRecurrenceOccurrences(startDate, endDate, startTime, endTime, eventData.recurrence)
+        const bulkEvents = occurrences.map((occ) => ({
+          title: eventData.title,
+          description: eventData.description,
+          eventType: eventData.eventType,
+          teamId,
+          startDate: occ.startDateTime,
+          endDate: occ.endDateTime,
+        }))
+        await eventsAPI.createEventsBulk(bulkEvents)
       } else {
-        // 신규 등록 시: 제목에 사용자 이름 추가 (처음만)
-        const titleWithName = user?.name 
-          ? `${eventData.title} (${user.name})` 
-          : eventData.title
-        await eventsAPI.createEvent({ ...finalEventData, title: titleWithName, teamId })
+        // 신규 단건 등록
+        await eventsAPI.createEvent({ ...finalEventData, teamId })
       }
       
       // 이벤트 목록 새로고침
@@ -776,13 +860,11 @@ function CalendarPage() {
     }
   }, [selectedEvent, selectedTeamId, user, loadEvents, handleCloseModal])
 
-  // 이벤트 삭제 핸들러
-  const handleDeleteEvent = useCallback(async (eventId) => {
-    if (!window.confirm('이 일정을 삭제하시겠습니까?')) return
-
+  // 실제 삭제 수행 (scope: null=단건, 'all'=반복 전체)
+  const performDelete = useCallback(async (eventId, scope = null) => {
     try {
-      await eventsAPI.deleteEvent(eventId)
-      
+      await eventsAPI.deleteEvent(eventId, scope)
+
       loadEvents()
       handleCloseModal()
     } catch (error) {
@@ -800,6 +882,41 @@ function CalendarPage() {
       }
     }
   }, [loadEvents, handleCloseModal])
+
+  // 이벤트 삭제 핸들러
+  const handleDeleteEvent = useCallback((eventId) => {
+    const target = events.find((e) => e.id === eventId) || selectedEvent || popupEvent
+    // 반복 일정이면 범위(이 일정만/전체) 선택 프롬프트 표시
+    if (target?.recurrenceGroupId) {
+      setRecurrencePrompt({ action: 'delete', eventId })
+      return
+    }
+    if (!window.confirm('이 일정을 삭제하시겠습니까?')) return
+    performDelete(eventId)
+  }, [events, selectedEvent, popupEvent, performDelete])
+
+  // 반복 일정 범위 선택 확정 (scope: 'single' | 'all')
+  const handleRecurrenceScope = useCallback(async (scope) => {
+    if (!recurrencePrompt) return
+    const apiScope = scope === 'all' ? 'all' : null
+    const { action, payload, eventId } = recurrencePrompt
+    setRecurrencePrompt(null)
+    if (action === 'delete') {
+      await performDelete(eventId, apiScope)
+    } else if (action === 'edit') {
+      try {
+        await eventsAPI.updateEvent(eventId, payload, apiScope)
+        loadEvents()
+        handleCloseModal()
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          console.error('이벤트 수정 실패:', error)
+        }
+        const errorMessage = error.response?.data?.message || error.message || '이벤트 수정에 실패했습니다.'
+        alert(errorMessage)
+      }
+    }
+  }, [recurrencePrompt, performDelete, loadEvents, handleCloseModal])
 
   // 이벤트 스타일 - 가시성 개선
   const eventStyleGetter = (event) => {
@@ -1036,16 +1153,10 @@ function CalendarPage() {
         <Calendar
           localizer={localizer}
           events={filteredEvents.map(event => {
-            // 제목에 이미 사용자 이름이 포함되어 있는지 확인 (예: "제목 (이름)" 형식)
-            const hasUserNameInTitle = event.title && /\([^)]+\)/.test(event.title)
-            // 사용자 이름이 있고, 제목에 이미 포함되어 있지 않으면 추가
-            const displayTitle = event.userName && !hasUserNameInTitle 
-              ? `${event.title} (${event.userName})` 
-              : event.title
-            
+            // 작성자 이름을 제목 앞쪽 "(이름) 내용" 형태로 정규화하여 표시
             return {
               ...event,
-              title: displayTitle,
+              title: formatDisplayTitle(event.title, event.userName),
             }
           })}
           startAccessor="start"
@@ -1104,6 +1215,40 @@ function CalendarPage() {
           teams={teams}
           selectedTeamId={selectedTeamId}
         />
+      )}
+
+      {/* 반복 일정 수정/삭제 범위 선택 */}
+      {recurrencePrompt && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">반복 일정</h3>
+            <p className="text-sm text-gray-600 mb-5">
+              {recurrencePrompt.action === 'delete'
+                ? '이 일정은 반복 일정입니다. 어떻게 삭제할까요?'
+                : '이 일정은 반복 일정입니다. 어떻게 수정할까요?'}
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => handleRecurrenceScope('single')}
+                className="btn-primary w-full"
+              >
+                이 일정만
+              </button>
+              <button
+                onClick={() => handleRecurrenceScope('all')}
+                className="btn-secondary w-full"
+              >
+                전체 반복 일정
+              </button>
+              <button
+                onClick={() => setRecurrencePrompt(null)}
+                className="text-sm text-gray-500 mt-1 hover:text-gray-700"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* "+N more" 일정 목록 모달 (옵션 3) */}
@@ -1170,7 +1315,7 @@ function CalendarPage() {
                               )}
                             </div>
                             <h3 className="text-lg font-bold text-gray-900 mb-1">
-                              {event.title}
+                              {getTitleContent(event.title) || event.title}
                             </h3>
                             {event.description && (
                               <p className="text-sm text-gray-600 mb-2 line-clamp-2">

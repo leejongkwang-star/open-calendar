@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Edit, Trash2, MessageCircle, MoreVertical, X } from 'lucide-react'
 import { toKoreanEventType } from '../utils/eventTypeMapping'
+import { getTitleContent } from '../utils/titleUtils'
 
 function EventPopup({ event, position, onClose, onEdit, onDelete, onMessage }) {
   const popupRef = useRef(null)
@@ -222,7 +223,7 @@ function EventPopup({ event, position, onClose, onEdit, onDelete, onMessage }) {
                 wordBreak: 'break-word',
               }}
             >
-              {event.title?.replace(/\s*\([^)]+\)\s*$/, '') || '제목 없음'}
+              {getTitleContent(event.title) || event.title || '제목 없음'}
             </div>
 
             {/* 날짜 */}

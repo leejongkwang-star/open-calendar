@@ -8,6 +8,110 @@ const router = express.Router()
 // 모든 라우트에 인증 미들웨어 적용
 router.use(authenticate)
 
+// 날짜+시간 문자열("YYYY-MM-DDTHH:mm" / "YYYY-MM-DD HH:mm" / "YYYY-MM-DD")을
+// 로컬 시간 기준으로 파싱하여 UTC Date로 변환 (PostgreSQL UTC 저장 호환)
+const parseDateTimeToUtc = (dateTimeString) => {
+  if (!dateTimeString) return null
+
+  const buildUtc = (year, month, day, hours, minutes) => {
+    const localDate = new Date(year, month - 1, day, hours || 0, minutes || 0, 0, 0)
+    return new Date(localDate.getTime() - localDate.getTimezoneOffset() * 60000)
+  }
+
+  if (dateTimeString.includes('T') || dateTimeString.includes(' ')) {
+    const separator = dateTimeString.includes('T') ? 'T' : ' '
+    const [datePart, timePart] = dateTimeString.split(separator)
+    const [year, month, day] = datePart.split('-').map(Number)
+    const [hours, minutes] = (timePart || '00:00').split(':').map(Number)
+    return buildUtc(year, month, day, hours, minutes)
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateTimeString)) {
+    const [year, month, day] = dateTimeString.split('-').map(Number)
+    return buildUtc(year, month, day, 0, 0)
+  }
+
+  return new Date(dateTimeString)
+}
+
+// 반복 일정 일괄 생성 (사전 생성 방식)
+router.post('/bulk', async (req, res, next) => {
+  try {
+    const userId = req.user.id
+    const { events, recurrenceGroupId } = req.body
+
+    if (!Array.isArray(events) || events.length === 0) {
+      return res.status(400).json({ message: '생성할 일정이 없습니다.' })
+    }
+
+    // 안전장치: 한 번에 생성 가능한 반복 일정 최대 개수
+    const MAX_OCCURRENCES = 366
+    if (events.length > MAX_OCCURRENCES) {
+      return res.status(400).json({ message: `반복 일정은 최대 ${MAX_OCCURRENCES}개까지 생성할 수 있습니다.` })
+    }
+
+    const validEventTypes = ['VACATION', 'MEETING', 'TRAINING', 'BUSINESS_TRIP', 'OTHER']
+    const groupId = recurrenceGroupId || `rec_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+
+    // 팀 구성원 권한 확인 (관리자 제외): 사용된 팀들에 대해 한 번씩만 확인
+    if (req.user.role !== 'ADMIN') {
+      const teamIds = [...new Set(events.map((e) => parseInt(e.teamId)).filter((v) => !Number.isNaN(v)))]
+      for (const teamId of teamIds) {
+        const teamMember = await prisma.teamMember.findFirst({ where: { teamId, userId } })
+        if (!teamMember) {
+          return res.status(403).json({ message: '해당 팀의 구성원만 일정을 등록할 수 있습니다.' })
+        }
+      }
+    }
+
+    const data = []
+    for (const e of events) {
+      if (!e.title || !String(e.title).trim()) {
+        return res.status(400).json({ message: '제목을 입력해주세요.' })
+      }
+      const parsedStart = parseDateTimeToUtc(e.startDate)
+      const parsedEnd = parseDateTimeToUtc(e.endDate)
+      if (!parsedStart || !parsedEnd) {
+        return res.status(400).json({ message: '유효한 날짜 형식이 아닙니다.' })
+      }
+      if (parsedStart > parsedEnd) {
+        return res.status(400).json({ message: '시작일은 종료일보다 이전이어야 합니다.' })
+      }
+      const normalizedEventType = e.eventType ? String(e.eventType).toUpperCase().trim() : 'OTHER'
+      if (!validEventTypes.includes(normalizedEventType)) {
+        return res.status(400).json({ message: `일정 유형이 올바르지 않습니다. 허용된 값: ${validEventTypes.join(', ')}` })
+      }
+      const teamId = parseInt(e.teamId)
+      if (Number.isNaN(teamId)) {
+        return res.status(400).json({ message: '팀 ID는 숫자여야 합니다.' })
+      }
+
+      data.push({
+        title: String(e.title).trim(),
+        description: e.description || null,
+        startDate: parsedStart,
+        endDate: parsedEnd,
+        startTime: parsedStart,
+        endTime: parsedEnd,
+        eventType: normalizedEventType,
+        userId,
+        teamId,
+        recurrenceGroupId: groupId,
+      })
+    }
+
+    const result = await prisma.event.createMany({ data })
+
+    res.status(201).json({
+      message: '반복 일정이 생성되었습니다.',
+      count: result.count,
+      recurrenceGroupId: groupId,
+    })
+  } catch (error) {
+    next(error)
+  }
+})
+
 // 이벤트 목록 조회
 router.get(
   '/',
@@ -67,6 +171,7 @@ router.get(
           eventType: true,
           userId: true,
           teamId: true,
+          recurrenceGroupId: true,
           user: {
             select: {
               id: true,
@@ -118,6 +223,7 @@ router.get(
           phone: event.user.teams?.[0]?.phone || null, // 전화번호 추가
           teamId: event.teamId,
           teamName: event.team.name,
+          recurrenceGroupId: event.recurrenceGroupId || null,
         }
       })
       
@@ -226,6 +332,7 @@ router.get('/:id', async (req, res, next) => {
       userName: event.user.name,
       teamId: event.teamId,
       teamName: event.team.name,
+      recurrenceGroupId: event.recurrenceGroupId,
     })
   } catch (error) {
     next(error)
@@ -262,7 +369,7 @@ router.post(
         return res.status(400).json({ message: errors.array()[0].msg })
       }
 
-      const { title, startDate, endDate, startTime, endTime, eventType, description, teamId } =
+      const { title, startDate, endDate, startTime, endTime, eventType, description, teamId, recurrenceGroupId } =
         req.body
       const userId = req.user.id
 
@@ -408,6 +515,7 @@ router.post(
           eventType: normalizedEventType,
           userId,
           teamId: parseInt(teamId),
+          recurrenceGroupId: recurrenceGroupId || null,
         },
         include: {
           user: {
@@ -439,6 +547,7 @@ router.post(
         userName: event.user.name,
         teamId: event.teamId,
         teamName: event.team.name,
+        recurrenceGroupId: event.recurrenceGroupId,
       })
     } catch (error) {
       next(error)
@@ -475,6 +584,7 @@ router.put(
 
       const { id } = req.params
       const userId = req.user.id
+      const scope = req.query.scope // 'all'이면 같은 반복 묶음 전체에 공통 필드 적용
       const { title, startDate, endDate, startTime, endTime, eventType, description, teamId } = req.body
 
       // 이벤트 조회
@@ -647,6 +757,26 @@ router.put(
         },
       })
 
+      // 전체 반복 일정 수정: 같은 묶음의 다른 일정들에는 공통 필드만 적용
+      // (날짜/시간은 각 일정의 고유 값을 유지하여 반복 패턴을 보존)
+      if (scope === 'all' && updatedEvent.recurrenceGroupId) {
+        const sharedData = {}
+        if (updateData.title !== undefined) sharedData.title = updateData.title
+        if (updateData.description !== undefined) sharedData.description = updateData.description
+        if (updateData.eventType !== undefined) sharedData.eventType = updateData.eventType
+        if (updateData.teamId !== undefined) sharedData.teamId = updateData.teamId
+
+        if (Object.keys(sharedData).length > 0) {
+          await prisma.event.updateMany({
+            where: {
+              recurrenceGroupId: updatedEvent.recurrenceGroupId,
+              id: { not: updatedEvent.id },
+            },
+            data: sharedData,
+          })
+        }
+      }
+
       // 이전 데이터 호환성: startTime/endTime이 별도로 있는 경우 startDate/endDate와 결합
       let start = updatedEvent.startDate
       if (updatedEvent.startTime && !updatedEvent.startDate) {
@@ -687,6 +817,7 @@ router.put(
         userName: updatedEvent.user.name,
         teamId: updatedEvent.teamId,
         teamName: updatedEvent.team.name,
+        recurrenceGroupId: updatedEvent.recurrenceGroupId,
       })
     } catch (error) {
       next(error)
@@ -699,6 +830,7 @@ router.delete('/:id', async (req, res, next) => {
   try {
     const { id } = req.params
     const userId = req.user.id
+    const scope = req.query.scope // 'all'이면 같은 반복 묶음 전체 삭제
 
     // 이벤트 조회
     const event = await prisma.event.findUnique({
@@ -712,6 +844,14 @@ router.delete('/:id', async (req, res, next) => {
     // 권한 확인: 본인이거나 관리자만 삭제 가능
     if (event.userId !== userId && req.user.role !== 'ADMIN') {
       return res.status(403).json({ message: '이 이벤트를 삭제할 권한이 없습니다.' })
+    }
+
+    // 전체 반복 일정 삭제
+    if (scope === 'all' && event.recurrenceGroupId) {
+      const result = await prisma.event.deleteMany({
+        where: { recurrenceGroupId: event.recurrenceGroupId },
+      })
+      return res.json({ message: '반복 일정이 모두 삭제되었습니다.', count: result.count })
     }
 
     await prisma.event.delete({

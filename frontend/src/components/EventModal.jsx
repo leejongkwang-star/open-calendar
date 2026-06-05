@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { X, Trash2, Calendar, Clock, FileText, Users } from 'lucide-react'
+import { X, Trash2, Calendar, Clock, FileText, Users, Repeat } from 'lucide-react'
 import { toEnglishEventType, toKoreanEventType, EVENT_TYPE_OPTIONS } from '../utils/eventTypeMapping'
+import { parseEventTitle, buildEventTitle } from '../utils/titleUtils'
 
 function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, selectedTeamId }) {
   const [formData, setFormData] = useState({
@@ -12,7 +13,14 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, sele
     eventType: 'VACATION',
     description: '',
     teamId: null,
+    recurrenceType: 'NONE',
+    recurrenceEndMode: 'count',
+    recurrenceCount: 10,
+    recurrenceUntil: '',
   })
+
+  // 제목 앞에 표시되는 작성자 이름 (수정 불가, 저장 시 "(이름) 내용" 형태로 결합)
+  const [ownerName, setOwnerName] = useState('')
 
   const isEditMode = event?.id
 
@@ -65,12 +73,10 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, sele
         // originalEndDate가 있으면 사용 (react-big-calendar용 변환 전 원본)
         const end = event.originalEndDate ? new Date(event.originalEndDate) : dbEndDate
         
-        // 수정 모드일 때 제목에서 사용자 이름 제거 (예: "제목 (이름)" → "제목")
-        let cleanTitle = event.title || ''
-        if (cleanTitle) {
-          // 제목 끝에 "(이름)" 형식이 있으면 제거
-          cleanTitle = cleanTitle.replace(/\s*\([^)]+\)\s*$/, '').trim()
-        }
+        // 수정 모드: 제목에서 작성자 이름과 내용 분리 (앞/뒤 "(이름)" 형식 모두 지원)
+        const parsed = parseEventTitle(event.title || '')
+        const cleanTitle = parsed.content
+        setOwnerName(parsed.name || event.userName || currentUser?.name || '')
         
         // 시간 포맷팅 (UTC 기준으로 시간 추출 - DB 값 그대로 표시)
         const formatTime = (dateObj) => {
@@ -107,6 +113,10 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, sele
           eventType: event.eventType || 'VACATION',
           description: event.description || '',
           teamId: event.teamId || getUserTeamId(),
+          recurrenceType: 'NONE',
+          recurrenceEndMode: 'count',
+          recurrenceCount: 10,
+          recurrenceUntil: '',
         })
       } else {
         // 신규 등록 시: 시작일을 선택한 날짜로 설정, 종료일도 시작일과 동일
@@ -117,6 +127,7 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, sele
         const startTime = '09:00'
         const endTime = '18:00'
         
+        setOwnerName(currentUser?.name || '')
         setFormData({
           title: '',
           startDate: startDateStr,
@@ -126,6 +137,10 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, sele
           eventType: 'VACATION',
           description: '',
           teamId: getUserTeamId(),
+          recurrenceType: 'NONE',
+          recurrenceEndMode: 'count',
+          recurrenceCount: 10,
+          recurrenceUntil: '',
         })
       }
     } else {
@@ -135,6 +150,7 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, sele
       const startTime = '09:00'
       const endTime = addOneHour(startTime)
       
+      setOwnerName(currentUser?.name || '')
       setFormData({
         title: '',
         startDate: startDateStr,
@@ -144,6 +160,10 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, sele
         eventType: 'VACATION',
         description: '',
         teamId: getUserTeamId(),
+        recurrenceType: 'NONE',
+        recurrenceEndMode: 'count',
+        recurrenceCount: 10,
+        recurrenceUntil: '',
       })
     }
   }, [event, isEditMode, teams, currentUser, selectedTeamId])
@@ -160,8 +180,23 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, sele
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    // 작성자 이름을 제목 앞에 결합: "(이름) 내용"
+    const finalTitle = buildEventTitle(ownerName, formData.title)
+    // 반복 일정 정보 (신규 등록 + 반복 선택 시에만)
+    const recurrence =
+      !isEditMode && formData.recurrenceType !== 'NONE'
+        ? {
+            type: formData.recurrenceType,
+            endMode: formData.recurrenceEndMode,
+            count: Number(formData.recurrenceCount) || 1,
+            until: formData.recurrenceUntil || null,
+          }
+        : null
+
     onSave({
       ...formData,
+      title: finalTitle,
+      recurrence,
       id: event?.id,
     })
   }
@@ -188,14 +223,26 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, sele
             <label className="block text-sm font-medium text-gray-700 mb-2">
               제목 <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className="input-field"
-              placeholder="일정 제목을 입력하세요"
-              required
-            />
+            <div className="flex items-stretch">
+              {ownerName && (
+                <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-100 text-gray-600 text-sm whitespace-nowrap select-none">
+                  ({ownerName})
+                </span>
+              )}
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                className={`input-field ${ownerName ? 'rounded-l-none' : ''}`}
+                placeholder="내용을 입력하세요"
+                required
+              />
+            </div>
+            {ownerName && (
+              <p className="mt-1 text-xs text-gray-400">
+                이름은 자동으로 제목 앞에 표시됩니다. 내용만 입력하세요.
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -384,6 +431,79 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, sele
               </select>
             </div>
           </div>
+
+          {!isEditMode && (
+            <div className="space-y-3 rounded-lg border border-gray-200 p-3 bg-gray-50">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Repeat className="w-4 h-4 inline mr-1" />
+                  반복
+                </label>
+                <select
+                  value={formData.recurrenceType}
+                  onChange={(e) => setFormData({ ...formData, recurrenceType: e.target.value })}
+                  className="input-field"
+                >
+                  <option value="NONE">반복 안 함</option>
+                  <option value="WEEKLY">매주</option>
+                  <option value="MONTHLY">매월</option>
+                  <option value="YEARLY">매년</option>
+                </select>
+              </div>
+
+              {formData.recurrenceType !== 'NONE' && (
+                <div className="space-y-3">
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="radio"
+                        name="recurrenceEndMode"
+                        value="count"
+                        checked={formData.recurrenceEndMode === 'count'}
+                        onChange={(e) => setFormData({ ...formData, recurrenceEndMode: e.target.value })}
+                      />
+                      횟수 지정
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="radio"
+                        name="recurrenceEndMode"
+                        value="until"
+                        checked={formData.recurrenceEndMode === 'until'}
+                        onChange={(e) => setFormData({ ...formData, recurrenceEndMode: e.target.value })}
+                      />
+                      종료일 지정
+                    </label>
+                  </div>
+
+                  {formData.recurrenceEndMode === 'count' ? (
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">반복 횟수 (최초 포함)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="366"
+                        value={formData.recurrenceCount}
+                        onChange={(e) => setFormData({ ...formData, recurrenceCount: e.target.value })}
+                        className="input-field"
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">반복 종료일</label>
+                      <input
+                        type="date"
+                        value={formData.recurrenceUntil}
+                        min={formData.startDate}
+                        onChange={(e) => setFormData({ ...formData, recurrenceUntil: e.target.value })}
+                        className="input-field"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
