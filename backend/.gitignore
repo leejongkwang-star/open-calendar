@@ -7,6 +7,9 @@ package-lock.json
 .env.local
 .env.*.local
 
+# 시크릿이 포함될 수 있는 실배포 스크립트 (템플릿 *.example.ps1 만 커밋)
+deploy-with-env.ps1
+
 # Logs
 logs
 *.log
