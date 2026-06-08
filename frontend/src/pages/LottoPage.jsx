@@ -111,10 +111,13 @@ function ballColor(n) {
 }
 
 function LottoBall({ n, size = 'md' }) {
-  const dim = size === 'sm' ? 'w-8 h-8 text-sm' : 'w-11 h-11 text-base'
+  const dim =
+    size === 'sm'
+      ? 'w-8 h-8 text-sm'
+      : 'w-9 h-9 text-sm sm:w-11 sm:h-11 sm:text-base'
   return (
     <div
-      className={`${dim} rounded-full flex items-center justify-center font-bold text-white shadow-md`}
+      className={`${dim} shrink-0 rounded-full flex items-center justify-center font-bold text-white shadow-md`}
       style={{ backgroundColor: ballColor(n) }}
     >
       {n}
@@ -375,13 +378,13 @@ export default function LottoPage() {
                     return (
                       <div
                         key={idx}
-                        className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100 animate-fade-in"
+                        className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg bg-gray-50 border border-gray-100 animate-fade-in"
                         style={{ animationDelay: `${idx * 0.08}s` }}
                       >
-                        <span className="w-6 text-sm font-semibold text-gray-400 shrink-0">
+                        <span className="w-5 sm:w-6 text-sm font-semibold text-gray-400 shrink-0">
                           {String.fromCharCode(65 + idx)}
                         </span>
-                        <div className="flex flex-wrap gap-2 flex-1">
+                        <div className="flex flex-nowrap gap-1.5 sm:gap-2 flex-1 justify-between sm:justify-start">
                           {set.map((n) => (
                             <LottoBall key={n} n={n} />
                           ))}
