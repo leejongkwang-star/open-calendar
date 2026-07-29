@@ -7,6 +7,7 @@ import eventsRoutes from './routes/events.js'
 import teamsRoutes from './routes/teams.js'
 import gamesRoutes from './routes/games.js'
 import lottoRoutes from './routes/lotto.js'
+import fastingRoutes from './routes/fasting.js'
 import { errorHandler } from './middleware/errorHandler.js'
 
 // 환경 변수 로드
@@ -130,6 +131,7 @@ app.use('/api/events', eventsRoutes)
 app.use('/api/teams', teamsRoutes)
 app.use('/api/games', gamesRoutes)
 app.use('/api/lotto', lottoRoutes)
+app.use('/api/fasting', fastingRoutes)
 
 // 404 핸들러
 app.use((req, res) => {

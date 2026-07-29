@@ -31,6 +31,7 @@ model User {
   events          Event[]
   createdTeams    Team[]    @relation("TeamCreator")
   gameScores      GameScore[]
+  fastingSessions FastingSession[]
 
   @@index([employeeNumber])
   @@index([status])
@@ -157,5 +158,24 @@ model GameScore {
   @@index([gameType, score])
   @@index([userId])
   @@map("game_scores")
+}
+
+// 단식 세션 모델 (직원별 단식 스케줄 관리)
+model FastingSession {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  startTime   DateTime  // 단식 시작 시간
+  endTime     DateTime? // 단식 종료 시간 (진행 중이면 null)
+  targetHours Int?      // 목표 단식 시간 (선택)
+  note        String?   // 메모 (선택)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, endTime]) // 진행 중인 세션 조회 최적화
+  @@index([startTime])
+  @@map("fasting_sessions")
 }
 

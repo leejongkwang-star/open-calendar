@@ -1,6 +1,6 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
-import { Calendar, Users, LogOut, Menu, Gamepad2, Sparkles, Clover } from 'lucide-react'
+import { Calendar, Users, LogOut, Menu, Gamepad2, Sparkles, Clover, Timer } from 'lucide-react'
 import { useState } from 'react'
 
 function Layout() {
@@ -73,6 +73,17 @@ function Layout() {
               >
                 <Clover className="w-4 h-4 mr-2" />
                 로또
+              </Link>
+              <Link
+                to="/fasting"
+                className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  isActive('/fasting')
+                    ? 'bg-primary-100 text-primary-700'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <Timer className="w-4 h-4 mr-2" />
+                단식
               </Link>
               {user?.role && user.role.toUpperCase() === 'ADMIN' && (
                 <Link
@@ -164,6 +175,18 @@ function Layout() {
               >
                 <Clover className="w-4 h-4 inline mr-2" />
                 로또
+              </Link>
+              <Link
+                to="/fasting"
+                className={`block px-3 py-2 rounded-md text-base font-medium ${
+                  isActive('/fasting')
+                    ? 'bg-primary-100 text-primary-700'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <Timer className="w-4 h-4 inline mr-2" />
+                단식
               </Link>
               {user?.role && user.role.toUpperCase() === 'ADMIN' && (
                 <Link
