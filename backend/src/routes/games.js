@@ -6,6 +6,17 @@ import { authenticate } from '../middleware/auth.js'
 const router = express.Router()
 
 // 게임 타입별 정렬 방향 정의
+const VALID_GAME_TYPES = [
+  'GAME_2048',
+  'SNAKE',
+  'TETRIS',
+  'REACTION',
+  'ROCK_PAPER_SCISSORS',
+  'TIC_TAC_TOE',
+  'SUDOKU',
+  'GALAGA',
+]
+
 const GAME_SORT_ORDER = {
   GAME_2048: 'desc', // 높은 점수가 좋음
   SNAKE: 'desc', // 높은 점수가 좋음
@@ -14,6 +25,7 @@ const GAME_SORT_ORDER = {
   ROCK_PAPER_SCISSORS: 'desc', // 높은 승률이 좋음
   TIC_TAC_TOE: 'desc', // 높은 승률이 좋음
   SUDOKU: 'asc', // 낮은 점수가 좋음 (시간)
+  GALAGA: 'desc', // 높은 점수가 좋음
 }
 
 // 점수 저장 (인증 필요)
@@ -22,7 +34,7 @@ router.post(
   authenticate,
   [
     body('gameType')
-      .isIn(['GAME_2048', 'SNAKE', 'TETRIS', 'REACTION', 'ROCK_PAPER_SCISSORS', 'TIC_TAC_TOE', 'SUDOKU'])
+      .isIn(VALID_GAME_TYPES)
       .withMessage('유효한 게임 타입이 아닙니다.'),
     body('score').isFloat({ min: 0 }).withMessage('점수는 0 이상의 숫자여야 합니다.'),
     body('metadata')
@@ -117,7 +129,7 @@ router.get(
   '/scores/:gameType',
   [
     param('gameType')
-      .isIn(['GAME_2048', 'SNAKE', 'TETRIS', 'REACTION', 'ROCK_PAPER_SCISSORS', 'TIC_TAC_TOE', 'SUDOKU'])
+      .isIn(VALID_GAME_TYPES)
       .withMessage('유효한 게임 타입이 아닙니다.'),
     query('limit').optional().isInt({ min: 1, max: 1000 }).withMessage('limit은 1-1000 사이의 숫자여야 합니다.'),
     query('offset').optional().isInt({ min: 0 }).withMessage('offset은 0 이상의 숫자여야 합니다.'),
@@ -187,7 +199,7 @@ router.get(
   authenticate,
   [
     param('gameType')
-      .isIn(['GAME_2048', 'SNAKE', 'TETRIS', 'REACTION', 'ROCK_PAPER_SCISSORS', 'TIC_TAC_TOE', 'SUDOKU'])
+      .isIn(VALID_GAME_TYPES)
       .withMessage('유효한 게임 타입이 아닙니다.'),
   ],
   async (req, res, next) => {
@@ -252,7 +264,7 @@ router.get(
   authenticate,
   [
     param('gameType')
-      .isIn(['GAME_2048', 'SNAKE', 'TETRIS', 'REACTION', 'ROCK_PAPER_SCISSORS', 'TIC_TAC_TOE', 'SUDOKU'])
+      .isIn(VALID_GAME_TYPES)
       .withMessage('유효한 게임 타입이 아닙니다.'),
   ],
   async (req, res, next) => {

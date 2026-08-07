@@ -8,9 +8,11 @@ import RockPaperScissors from '../components/games/RockPaperScissors'
 import TicTacToe from '../components/games/TicTacToe'
 import Tetris from '../components/games/Tetris'
 import Sudoku from '../components/games/Sudoku'
+import GalagaLite from '../components/games/GalagaLite'
 import GameRankings from '../components/games/GameRankings'
 
 const GAMES = [
+  { id: 'galaga', name: '갤러그 라이트', icon: '🚀', component: GalagaLite },
   { id: '2048', name: '2048', icon: '🔢', component: Game2048 },
   { id: 'reaction', name: '반응속도 테스트', icon: '⚡', component: ReactionTest },
   { id: 'snake', name: '뱀 게임', icon: '🐍', component: SnakeGame },

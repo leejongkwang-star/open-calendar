@@ -140,6 +140,7 @@ enum GameType {
   ROCK_PAPER_SCISSORS
   TIC_TAC_TOE
   SUDOKU
+  GALAGA
 }
 
 // 게임 점수 모델
