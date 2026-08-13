@@ -399,6 +399,22 @@ function GalagaLite() {
               </div>
             </div>
           )}
+
+          {gameStarted && !gameOver && (
+            <button
+              type="button"
+              aria-label="폭탄"
+              onPointerDown={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                inputRef.current.bomb = true
+              }}
+              className="absolute right-2 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-amber-500 text-xs font-black text-black shadow-lg active:bg-amber-400 sm:h-12 sm:w-12"
+              style={{ bottom: '28px', touchAction: 'manipulation' }}
+            >
+              BOMB
+            </button>
+          )}
         </div>
 
         <div className="mt-3 grid grid-cols-4 gap-2 text-center font-mono text-xs">
@@ -421,7 +437,7 @@ function GalagaLite() {
         </div>
       </div>
 
-      <div className="flex gap-2 mb-2">
+      <div className="flex flex-wrap justify-center gap-2 mb-2">
         {!gameStarted && (
           <button
             onClick={startGame}
@@ -445,8 +461,12 @@ function GalagaLite() {
               {isPaused ? '계속' : '일시정지'}
             </button>
             <button
-              onClick={() => { inputRef.current.bomb = true }}
-              className="px-4 py-2 bg-amber-500 text-black rounded-sm hover:bg-amber-400 font-bold"
+              type="button"
+              onPointerDown={(e) => {
+                e.preventDefault()
+                inputRef.current.bomb = true
+              }}
+              className="hidden sm:inline-flex px-4 py-2 bg-amber-500 text-black rounded-sm hover:bg-amber-400 font-bold"
             >
               BOMB
             </button>
@@ -476,7 +496,7 @@ function GalagaLite() {
       <p className="text-xs text-gray-400 text-center max-w-md leading-relaxed">
         PC: 방향키/WASD 이동 · Shift 저속(히트박스) · Z/Space 발사 · X 봄 · P 일시정지
         <br />
-        모바일: 화면 아무 곳이나 잡고 밀면 기체가 따라갑니다. 손가락은 아래, 비행기는 위에 두고 조작하세요.
+        모바일: 화면 아래를 밀면 이동 · 오른쪽 아래 BOMB로 탄막 제거
       </p>
     </div>
   )
