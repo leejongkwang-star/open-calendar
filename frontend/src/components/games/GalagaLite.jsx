@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Pause, Play, RotateCcw, Trophy } from 'lucide-react'
 import { gamesAPI } from '../../api/games'
-import { WIDTH, HEIGHT, MAX_WAVES } from './galaga/constants'
-import { createInitialState, renderGame, updateGame } from './galaga/engine'
+import { HEIGHT, MAX_STAGES, WIDTH } from './galaga/constants'
+import { createInitialState, updateGame } from './galaga/engine'
+import { renderGame } from './galaga/render'
 
 function GalagaLite() {
   const canvasRef = useRef(null)
@@ -10,8 +11,13 @@ function GalagaLite() {
   const inputRef = useRef({
     left: false,
     right: false,
+    up: false,
+    down: false,
     fire: false,
+    focus: false,
+    bomb: false,
     dragX: null,
+    dragY: null,
     autoFire: false,
     dragging: false,
   })
@@ -26,18 +32,17 @@ function GalagaLite() {
   const [cleared, setCleared] = useState(false)
   const [score, setScore] = useState(0)
   const [bestScore, setBestScore] = useState(0)
-  const [lives, setLives] = useState(3)
-  const [wave, setWave] = useState(1)
+  const [lives, setLives] = useState(4)
+  const [bombs, setBombs] = useState(3)
+  const [stage, setStage] = useState(1)
   const [combo, setCombo] = useState(0)
-  const [statusMessage, setStatusMessage] = useState('')
+  const [graze, setGraze] = useState(0)
 
   useEffect(() => {
     const loadBestScore = async () => {
       try {
         const result = await gamesAPI.getMyBestScore('GALAGA')
-        if (result.score) {
-          setBestScore(result.score.score)
-        }
+        if (result.score) setBestScore(result.score.score)
       } catch (error) {
         console.error('최고 기록 로드 실패:', error)
       }
@@ -48,13 +53,10 @@ function GalagaLite() {
   const syncHud = useCallback((state) => {
     setScore(state.score)
     setLives(state.lives)
-    setWave(state.wave)
+    setBombs(state.bombs)
+    setStage(state.stage)
     setCombo(state.combo)
-    if (state.status === 'waveClear') {
-      setStatusMessage(state.wave >= MAX_WAVES ? '최종 웨이브 클리어!' : `웨이브 ${state.wave} 클리어!`)
-    } else {
-      setStatusMessage('')
-    }
+    setGraze(state.graze)
   }, [])
 
   const saveScoreIfNeeded = useCallback(async (finalScore, state) => {
@@ -62,9 +64,10 @@ function GalagaLite() {
     savedScoreRef.current = true
     try {
       const result = await gamesAPI.saveScore('GALAGA', finalScore, {
-        wave: state.wave,
+        stage: state.stage,
         cleared: state.status === 'cleared',
         livesLeft: state.lives,
+        graze: state.graze,
       })
       if (result?.score?.score != null) {
         setBestScore((prev) => Math.max(prev, result.score.score))
@@ -88,7 +91,8 @@ function GalagaLite() {
     const state = stateRef.current
     if (!canvas || !state) return
     const ctx = canvas.getContext('2d')
-    renderGame(ctx, state)
+    ctx.imageSmoothingEnabled = false
+    renderGame(ctx, state, { focus: inputRef.current.focus })
   }, [])
 
   const loop = useCallback((time) => {
@@ -99,16 +103,20 @@ function GalagaLite() {
     lastTimeRef.current = time
     const dt = Math.min(rawDt, 0.032)
 
-    if (!isPausedRef.current && (state.status === 'playing' || state.status === 'waveClear')) {
+    if (!isPausedRef.current && state.status === 'playing') {
       const input = inputRef.current
-      // 터치 디바이스: 플레이 중 자동 연사 / PC: Space·Z
-      const fire = input.autoFire || input.fire
       updateGame(state, dt, {
         left: input.left,
         right: input.right,
-        fire,
+        up: input.up,
+        down: input.down,
+        fire: input.autoFire || input.fire,
+        focus: input.focus,
+        bomb: input.bomb,
         dragX: input.dragX,
+        dragY: input.dragY,
       })
+      input.bomb = false
       syncHud(state)
 
       if (state.status === 'gameOver') {
@@ -132,7 +140,6 @@ function GalagaLite() {
     return stopLoop
   }, [gameStarted, loop, stopLoop])
 
-  // 키보드
   useEffect(() => {
     const onKeyDown = (e) => {
       if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
@@ -143,8 +150,24 @@ function GalagaLite() {
         inputRef.current.right = true
         e.preventDefault()
       }
+      if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+        inputRef.current.up = true
+        e.preventDefault()
+      }
+      if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+        inputRef.current.down = true
+        e.preventDefault()
+      }
       if (e.code === 'Space' || e.code === 'KeyZ') {
         inputRef.current.fire = true
+        e.preventDefault()
+      }
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+        inputRef.current.focus = true
+        e.preventDefault()
+      }
+      if ((e.code === 'KeyX' || e.code === 'KeyC') && gameStarted && !gameOver) {
+        inputRef.current.bomb = true
         e.preventDefault()
       }
       if (e.code === 'KeyP' && gameStarted && !gameOver) {
@@ -157,7 +180,10 @@ function GalagaLite() {
     const onKeyUp = (e) => {
       if (e.code === 'ArrowLeft' || e.code === 'KeyA') inputRef.current.left = false
       if (e.code === 'ArrowRight' || e.code === 'KeyD') inputRef.current.right = false
+      if (e.code === 'ArrowUp' || e.code === 'KeyW') inputRef.current.up = false
+      if (e.code === 'ArrowDown' || e.code === 'KeyS') inputRef.current.down = false
       if (e.code === 'Space' || e.code === 'KeyZ') inputRef.current.fire = false
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') inputRef.current.focus = false
     }
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
@@ -167,12 +193,14 @@ function GalagaLite() {
     }
   }, [gameStarted, gameOver])
 
-  const getGameXFromClientX = (clientX) => {
+  const getGamePos = (clientX, clientY) => {
     const canvas = canvasRef.current
     if (!canvas) return null
     const rect = canvas.getBoundingClientRect()
-    const scaleX = WIDTH / rect.width
-    return (clientX - rect.left) * scaleX
+    return {
+      x: (clientX - rect.left) * (WIDTH / rect.width),
+      y: (clientY - rect.top) * (HEIGHT / rect.height) - 28,
+    }
   }
 
   const handlePointerDown = (e) => {
@@ -182,8 +210,11 @@ function GalagaLite() {
       e.preventDefault()
       inputRef.current.autoFire = true
       inputRef.current.dragging = true
-      const x = getGameXFromClientX(e.clientX)
-      if (x != null) inputRef.current.dragX = x
+      const pos = getGamePos(e.clientX, e.clientY)
+      if (pos) {
+        inputRef.current.dragX = pos.x
+        inputRef.current.dragY = pos.y
+      }
       try {
         e.currentTarget.setPointerCapture(e.pointerId)
       } catch {
@@ -198,14 +229,18 @@ function GalagaLite() {
     if (!gameStarted || gameOver || isPaused) return
     if (!inputRef.current.dragging) return
     e.preventDefault()
-    const x = getGameXFromClientX(e.clientX)
-    if (x != null) inputRef.current.dragX = x
+    const pos = getGamePos(e.clientX, e.clientY)
+    if (pos) {
+      inputRef.current.dragX = pos.x
+      inputRef.current.dragY = pos.y
+    }
   }
 
   const handlePointerUp = () => {
     if (inputRef.current.dragging) {
       inputRef.current.dragging = false
-      inputRef.current.dragX = null // 위치는 플레이어에 이미 반영됨, 자동 연사 유지
+      inputRef.current.dragX = null
+      inputRef.current.dragY = null
     } else {
       inputRef.current.fire = false
     }
@@ -221,22 +256,27 @@ function GalagaLite() {
     inputRef.current = {
       left: false,
       right: false,
+      up: false,
+      down: false,
       fire: false,
+      focus: false,
+      bomb: false,
       dragX: null,
+      dragY: null,
       autoFire: touchDevice,
       dragging: false,
     }
     setScore(0)
-    setLives(3)
-    setWave(1)
+    setLives(4)
+    setBombs(3)
+    setStage(1)
     setCombo(0)
+    setGraze(0)
     setGameOver(false)
     setCleared(false)
     isPausedRef.current = false
     setIsPaused(false)
-    setStatusMessage('')
     setGameStarted(true)
-    // 첫 프레임 그리기
     requestAnimationFrame(() => draw())
   }
 
@@ -249,24 +289,25 @@ function GalagaLite() {
     isPausedRef.current = false
     setIsPaused(false)
     setScore(0)
-    setLives(3)
-    setWave(1)
+    setLives(4)
+    setBombs(3)
+    setStage(1)
     setCombo(0)
-    setStatusMessage('')
+    setGraze(0)
     savedScoreRef.current = false
     const canvas = canvasRef.current
     if (canvas) {
       const ctx = canvas.getContext('2d')
-      ctx.fillStyle = '#0b1224'
+      ctx.fillStyle = '#08060f'
       ctx.fillRect(0, 0, WIDTH, HEIGHT)
     }
   }
 
   return (
     <div className="flex flex-col items-center">
-      <h2 className="text-2xl font-bold mb-2">갤러그 라이트</h2>
+      <h2 className="text-2xl font-bold mb-1 tracking-wide">탄막 슈팅</h2>
       <p className="text-sm text-gray-500 mb-4 text-center">
-        PC: ←→ 이동, Space/Z 발사 · 모바일: 드래그 이동 + 자동 연사
+        8-BIT DANMAKU · 탄막 사이를 피하며 8스테이지를 돌파하세요
       </p>
 
       <div className="flex flex-col sm:flex-row gap-4 mb-4 items-start">
@@ -275,8 +316,13 @@ function GalagaLite() {
             ref={canvasRef}
             width={WIDTH}
             height={HEIGHT}
-            className="rounded-lg shadow-lg border border-gray-700 bg-gray-900 touch-none max-w-full w-full sm:w-[360px]"
-            style={{ aspectRatio: `${WIDTH} / ${HEIGHT}`, touchAction: 'none' }}
+            className="rounded-sm shadow-lg border-4 border-gray-800 bg-black touch-none max-w-full"
+            style={{
+              width: 'min(100%, 384px)',
+              aspectRatio: `${WIDTH} / ${HEIGHT}`,
+              touchAction: 'none',
+              imageRendering: 'pixelated',
+            }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
@@ -284,75 +330,76 @@ function GalagaLite() {
           />
 
           {!gameStarted && !gameOver && (
-            <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-lg">
-              <div className="text-white text-center px-4">
-                <div className="text-xl font-bold mb-2">갤러그 라이트</div>
-                <p className="text-sm text-gray-300 mb-4">5웨이브를 클리어하세요</p>
+            <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+              <div className="text-white text-center px-4 font-mono">
+                <div className="text-lg font-bold mb-1 text-yellow-300">STAR HELL</div>
+                <p className="text-xs text-gray-300 mb-4 leading-relaxed">
+                  작은 히트박스로 탄막을 피하세요
+                  <br />
+                  8 STAGE · 4 LIFE · BOMB
+                </p>
                 <button
                   onClick={startGame}
-                  className="px-5 py-2 bg-primary-600 rounded-lg hover:bg-primary-700 font-semibold"
+                  className="px-5 py-2 bg-yellow-400 text-black rounded-sm hover:bg-yellow-300 font-bold"
                 >
-                  시작
+                  START
                 </button>
               </div>
             </div>
           )}
 
           {isPaused && gameStarted && !gameOver && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg">
-              <div className="text-white text-xl font-bold">일시정지</div>
+            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+              <div className="text-yellow-300 text-xl font-mono font-bold">PAUSE</div>
             </div>
           )}
 
           {gameOver && (
-            <div className="absolute inset-0 bg-black/75 flex items-center justify-center rounded-lg">
-              <div className="text-white text-center px-4">
-                <div className="text-2xl font-bold mb-2">
-                  {cleared ? '클리어!' : '게임 오버!'}
+            <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
+              <div className="text-white text-center px-4 font-mono">
+                <div className="text-2xl font-bold mb-2 text-yellow-300">
+                  {cleared ? 'ALL CLEAR' : 'GAME OVER'}
                 </div>
-                <div className="text-lg mb-4">점수: {score.toLocaleString()}</div>
+                <div className="text-sm mb-1">SCORE {score.toLocaleString()}</div>
+                <div className="text-xs text-gray-400 mb-4">STAGE {stage} · GRAZE {graze}</div>
                 <button
                   onClick={startGame}
-                  className="px-5 py-2 bg-primary-600 rounded-lg hover:bg-primary-700 font-semibold"
+                  className="px-5 py-2 bg-yellow-400 text-black rounded-sm hover:bg-yellow-300 font-bold"
                 >
-                  다시하기
+                  RETRY
                 </button>
               </div>
             </div>
           )}
-
-          {statusMessage && gameStarted && !gameOver && (
-            <div className="absolute top-1/3 left-0 right-0 text-center pointer-events-none">
-              <span className="inline-block bg-black/50 text-yellow-300 font-bold px-4 py-2 rounded-lg text-lg">
-                {statusMessage}
-              </span>
-            </div>
-          )}
         </div>
 
-        <div className="flex sm:flex-col gap-2 w-full sm:w-40 justify-center">
-          <div className="bg-gray-800 text-white px-4 py-2 rounded flex-1">
-            <div className="text-xs text-gray-300">점수</div>
-            <div className="text-xl font-bold">{score.toLocaleString()}</div>
+        <div className="flex sm:flex-col gap-2 w-full sm:w-40 justify-center font-mono">
+          <div className="bg-gray-900 text-yellow-300 px-4 py-2 rounded-sm flex-1 border border-gray-700">
+            <div className="text-[10px] text-gray-400">SCORE</div>
+            <div className="text-lg font-bold">{score.toLocaleString()}</div>
           </div>
-          <div className="bg-gray-800 text-white px-4 py-2 rounded flex-1">
-            <div className="text-xs text-gray-300 flex items-center gap-1">
-              <Trophy className="w-3 h-3" /> 최고
+          <div className="bg-gray-900 text-white px-4 py-2 rounded-sm flex-1 border border-gray-700">
+            <div className="text-[10px] text-gray-400 flex items-center gap-1">
+              <Trophy className="w-3 h-3" /> BEST
             </div>
-            <div className="text-xl font-bold">{Math.floor(bestScore).toLocaleString()}</div>
+            <div className="text-lg font-bold">{Math.floor(bestScore).toLocaleString()}</div>
           </div>
-          <div className="bg-gray-800 text-white px-4 py-2 rounded flex-1">
-            <div className="text-xs text-gray-300">웨이브</div>
-            <div className="text-xl font-bold">{wave} / {MAX_WAVES}</div>
+          <div className="bg-gray-900 text-white px-4 py-2 rounded-sm flex-1 border border-gray-700">
+            <div className="text-[10px] text-gray-400">STAGE</div>
+            <div className="text-lg font-bold">{stage} / {MAX_STAGES}</div>
           </div>
-          <div className="bg-gray-800 text-white px-4 py-2 rounded flex-1">
-            <div className="text-xs text-gray-300">목숨</div>
-            <div className="text-xl font-bold">{lives}</div>
+          <div className="bg-gray-900 text-white px-4 py-2 rounded-sm flex-1 border border-gray-700">
+            <div className="text-[10px] text-gray-400">LIFE / BOMB</div>
+            <div className="text-lg font-bold">{lives} / {bombs}</div>
+          </div>
+          <div className="bg-gray-900 text-cyan-300 px-4 py-2 rounded-sm flex-1 border border-gray-700">
+            <div className="text-[10px] text-gray-400">GRAZE</div>
+            <div className="text-lg font-bold">{graze}</div>
           </div>
           {combo > 1 && (
-            <div className="bg-amber-600 text-white px-4 py-2 rounded flex-1">
-              <div className="text-xs">콤보</div>
-              <div className="text-xl font-bold">x{combo}</div>
+            <div className="bg-amber-600 text-white px-4 py-2 rounded-sm flex-1">
+              <div className="text-[10px]">COMBO</div>
+              <div className="text-lg font-bold">x{combo}</div>
             </div>
           )}
         </div>
@@ -362,36 +409,46 @@ function GalagaLite() {
         {!gameStarted && (
           <button
             onClick={startGame}
-            className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700"
+            className="px-4 py-2 bg-yellow-400 text-black rounded-sm hover:bg-yellow-300 font-bold"
           >
             시작
           </button>
         )}
         {gameStarted && !gameOver && (
-          <button
-            onClick={() => {
-              setIsPaused((p) => {
-                isPausedRef.current = !p
-                return !p
-              })
-            }}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
-          >
-            {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
-            {isPaused ? '계속' : '일시정지'}
-          </button>
+          <>
+            <button
+              onClick={() => {
+                setIsPaused((p) => {
+                  isPausedRef.current = !p
+                  return !p
+                })
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-white rounded-sm hover:bg-gray-600"
+            >
+              {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+              {isPaused ? '계속' : '일시정지'}
+            </button>
+            <button
+              onClick={() => { inputRef.current.bomb = true }}
+              className="px-4 py-2 bg-amber-500 text-black rounded-sm hover:bg-amber-400 font-bold"
+            >
+              BOMB
+            </button>
+          </>
         )}
         <button
           onClick={resetGame}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+          className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-white rounded-sm hover:bg-gray-600"
         >
           <RotateCcw className="w-4 h-4" />
           리셋
         </button>
       </div>
 
-      <p className="text-xs text-gray-400 text-center max-w-md">
-        모바일에서는 화면을 드래그해 이동하고, 터치 조작 시 자동으로 발사됩니다.
+      <p className="text-xs text-gray-400 text-center max-w-md leading-relaxed">
+        PC: 방향키/WASD 이동 · Shift 저속(히트박스) · Z/Space 발사 · X 봄 · P 일시정지
+        <br />
+        모바일: 드래그로 전방향 이동 + 자동연사 · BOMB 버튼으로 탄막 제거
       </p>
     </div>
   )

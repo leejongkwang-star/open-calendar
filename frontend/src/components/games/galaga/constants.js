@@ -1,54 +1,66 @@
-export const WIDTH = 360
-export const HEIGHT = 540
+export const WIDTH = 256
+export const HEIGHT = 384
 
-export const PLAYER_WIDTH = 28
-export const PLAYER_HEIGHT = 20
-export const PLAYER_Y = HEIGHT - 48
-export const PLAYER_SPEED = 280
+export const PLAYER_W = 14
+export const PLAYER_H = 16
+export const PLAYER_SPEED = 168
+export const FOCUS_SPEED = 78
+export const HIT_RADIUS = 2.6
+export const GRAZE_RADIUS = 11
 
-export const BULLET_WIDTH = 4
-export const BULLET_HEIGHT = 10
-export const PLAYER_BULLET_SPEED = 520
-export const ENEMY_BULLET_SPEED = 220
-export const FIRE_COOLDOWN = 0.25
-export const MAX_PLAYER_BULLETS = 3
+export const PLAYER_BULLET_SPEED = 420
+export const FIRE_COOLDOWN = 0.11
+export const MAX_PLAYER_BULLETS = 14
+export const MAX_ENEMY_BULLETS = 520
 
-export const ENEMY_WIDTH = 24
-export const ENEMY_HEIGHT = 20
-export const FORMATION_SPEED = 60
-export const FORMATION_DROP = 12
-export const DIVE_SPEED = 220
+export const LIVES = 4
+export const BOMBS = 3
+export const INVINCIBLE_TIME = 2.2
+export const BOMB_TIME = 0.85
 
-export const LIVES = 3
-export const INVINCIBLE_TIME = 1.5
-export const COMBO_WINDOW = 2
-export const MAX_WAVES = 5
+export const MAX_STAGES = 8
+export const EXTRA_LIFE_SCORES = [30000, 80000, 160000]
 
-export const ENEMY_TYPES = {
-  grunt: { hp: 1, score: 100, color: '#60a5fa', canDive: false, canShoot: false },
-  scout: { hp: 1, score: 150, color: '#34d399', canDive: true, canShoot: false },
-  elite: { hp: 2, score: 300, color: '#f472b6', canDive: true, canShoot: true },
+export const PALETTE = {
+  bg: '#08060f',
+  bg2: '#120c22',
+  star1: '#ffffff',
+  star2: '#7a6cff',
+  star3: '#3d4a8a',
+  player: ['#1ec8ff', '#ffffff', '#0b6db0'],
+  hitbox: '#ff3b5c',
+  pBullet: '#fff36b',
+  hud: '#f4e8c1',
 }
 
-/** 웨이브별 적 배치 (행 단위, 중앙 정렬) */
-export const WAVE_TEMPLATES = [
-  [['grunt', 'grunt', 'grunt', 'grunt', 'grunt', 'grunt', 'grunt', 'grunt']],
-  [
-    ['scout', 'scout', 'scout', 'scout'],
-    ['grunt', 'grunt', 'grunt', 'grunt', 'grunt', 'grunt'],
-  ],
-  [
-    ['scout', 'elite', 'scout', 'elite', 'scout'],
-    ['grunt', 'grunt', 'grunt', 'grunt', 'grunt', 'grunt'],
-  ],
-  [
-    ['elite', 'scout', 'elite', 'scout', 'elite'],
-    ['scout', 'grunt', 'scout', 'grunt', 'scout', 'grunt'],
-    ['grunt', 'grunt', 'grunt', 'grunt'],
-  ],
-  [
-    ['elite'],
-    ['scout', 'elite', 'scout', 'elite', 'scout'],
-    ['grunt', 'grunt', 'scout', 'scout', 'grunt', 'grunt'],
-  ],
+export const ENEMY_DEFS = {
+  drone: { hp: 6, score: 200, w: 14, h: 14, colors: ['#ff5d5d', '#ffd15a'] },
+  fan: { hp: 10, score: 350, w: 16, h: 14, colors: ['#5dff8a', '#d6ff7a'] },
+  spinner: { hp: 16, score: 500, w: 16, h: 16, colors: ['#c45dff', '#ffa6ff'] },
+  gunner: { hp: 18, score: 600, w: 18, h: 14, colors: ['#5dd6ff', '#ffe08a'] },
+  sniper: { hp: 8, score: 400, w: 12, h: 16, colors: ['#ff8a3d', '#fff1a8'] },
+  tank: { hp: 28, score: 900, w: 20, h: 18, colors: ['#8a8a8a', '#ffe066'] },
+  midboss: { hp: 120, score: 5000, w: 36, h: 28, colors: ['#ff4d8d', '#fff36b'] },
+  boss: { hp: 220, score: 15000, w: 48, h: 36, colors: ['#ff2d55', '#7af7ff'] },
+}
+
+export const STAGES = [
+  { name: 'STAGE 1', title: 'ORBIT ENTRY', length: 22, hasBoss: false },
+  { name: 'STAGE 2', title: 'METEOR RAIN', length: 24, hasBoss: false },
+  { name: 'STAGE 3', title: 'SPIRAL GATE', length: 20, hasBoss: true, boss: 'midboss' },
+  { name: 'STAGE 4', title: 'CROSSFIRE', length: 26, hasBoss: false },
+  { name: 'STAGE 5', title: 'VOID CANNON', length: 18, hasBoss: true, boss: 'midboss' },
+  { name: 'STAGE 6', title: 'BULLET HELL', length: 28, hasBoss: false },
+  { name: 'STAGE 7', title: 'OVERLOAD', length: 30, hasBoss: false },
+  { name: 'STAGE 8', title: 'FINAL CORE', length: 14, hasBoss: true, boss: 'boss' },
 ]
+
+export function difficulty(stage) {
+  const t = Math.max(0, stage - 1)
+  return {
+    speed: 1 + t * 0.16,
+    density: 1 + t * 0.18,
+    hp: 1 + t * 0.22,
+    fire: Math.max(0.42, 1 - t * 0.07),
+  }
+}

@@ -12,7 +12,7 @@ import GalagaLite from '../components/games/GalagaLite'
 import GameRankings from '../components/games/GameRankings'
 
 const GAMES = [
-  { id: 'galaga', name: '갤러그 라이트', icon: '🚀', component: GalagaLite },
+  { id: 'galaga', name: '탄막 슈팅', icon: '🚀', component: GalagaLite },
   { id: '2048', name: '2048', icon: '🔢', component: Game2048 },
   { id: 'reaction', name: '반응속도 테스트', icon: '⚡', component: ReactionTest },
   { id: 'snake', name: '뱀 게임', icon: '🐍', component: SnakeGame },

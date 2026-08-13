@@ -11,7 +11,7 @@ const GAME_NAMES = {
   ROCK_PAPER_SCISSORS: '가위바위보',
   TIC_TAC_TOE: '틱택토',
   SUDOKU: '스도쿠',
-  GALAGA: '갤러그 라이트',
+  GALAGA: '탄막 슈팅',
 }
 
 const GAME_TYPES = Object.keys(GAME_NAMES)
