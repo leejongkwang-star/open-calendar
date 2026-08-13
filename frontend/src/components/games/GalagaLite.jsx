@@ -106,37 +106,41 @@ function GalagaLite() {
     const dt = Math.min(rawDt, 0.032)
 
     if (!isPausedRef.current && state.status === 'playing') {
-      const input = inputRef.current
-      updateGame(state, dt, {
-        left: input.left,
-        right: input.right,
-        up: input.up,
-        down: input.down,
-        fire: input.autoFire || input.fire,
-        focus: input.focus,
-        bomb: input.bomb,
-        dragX: input.dragX,
-        dragY: input.dragY,
-      })
-      input.bomb = false
-      if (soundOnRef.current) drainEvents(state)
-      else if (state.events) state.events.length = 0
+      try {
+        const input = inputRef.current
+        updateGame(state, dt, {
+          left: input.left,
+          right: input.right,
+          up: input.up,
+          down: input.down,
+          fire: input.autoFire || input.fire,
+          focus: input.focus,
+          bomb: input.bomb,
+          dragX: input.dragX,
+          dragY: input.dragY,
+        })
+        input.bomb = false
+        if (soundOnRef.current) drainEvents(state)
+        else if (state.events) state.events.length = 0
 
-      hudAccRef.current += dt
-      if (hudAccRef.current >= 0.15) {
-        hudAccRef.current = 0
-        syncHud(state)
-      }
+        hudAccRef.current += dt
+        if (hudAccRef.current >= 0.15) {
+          hudAccRef.current = 0
+          syncHud(state)
+        }
 
-      if (state.status === 'gameOver') {
-        syncHud(state)
-        setGameOver(true)
-        saveScoreIfNeeded(state.score, state)
-      } else if (state.status === 'cleared') {
-        syncHud(state)
-        setCleared(true)
-        setGameOver(true)
-        saveScoreIfNeeded(state.score, state)
+        if (state.status === 'gameOver') {
+          syncHud(state)
+          setGameOver(true)
+          saveScoreIfNeeded(state.score, state)
+        } else if (state.status === 'cleared') {
+          syncHud(state)
+          setCleared(true)
+          setGameOver(true)
+          saveScoreIfNeeded(state.score, state)
+        }
+      } catch (err) {
+        console.error('게임 루프 오류:', err)
       }
     }
 
@@ -336,7 +340,6 @@ function GalagaLite() {
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
           />
 
           {!gameStarted && !gameOver && (

@@ -109,10 +109,10 @@ export function renderGame(ctx, state, { focus = false } = {}) {
   })
 
   const blink = state.invincible > 0 && Math.floor(state.invincible * 12) % 2 === 0
-  if (!blink) {
+  if (state.respawnTimer <= 0 && !blink) {
     drawSprite(ctx, PLAYER_PX, state.player.x, state.player.y, PALETTE.player, 2)
   }
-  if (focus || state.invincible > 0) {
+  if (state.respawnTimer <= 0 && (focus || state.invincible > 0)) {
     const cx = state.player.x + PLAYER_W / 2
     const cy = state.player.y + PLAYER_H / 2
     px(ctx, cx - HIT_RADIUS, cy - HIT_RADIUS, HIT_RADIUS * 2, HIT_RADIUS * 2, PALETTE.hitbox)

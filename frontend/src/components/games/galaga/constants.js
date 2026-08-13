@@ -18,8 +18,10 @@ export const ENEMY_HURT_PAD = 4
 
 export const LIVES = 4
 export const BOMBS = 3
-export const INVINCIBLE_TIME = 2.2
+export const INVINCIBLE_TIME = 2.4
 export const BOMB_TIME = 0.85
+export const RESPAWN_DELAY = 0.7
+export const PLAYER_SPAWN_Y = HEIGHT - 56
 
 export const MAX_STAGES = 8
 export const EXTRA_LIFE_SCORES = [30000, 80000, 160000]

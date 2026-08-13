@@ -17,8 +17,10 @@ import {
   MAX_STAGES,
   PLAYER_BULLET_SPEED,
   PLAYER_H,
+  PLAYER_SPAWN_Y,
   PLAYER_SPEED,
   PLAYER_W,
+  RESPAWN_DELAY,
   STAGES,
   WIDTH,
   difficulty,
@@ -154,9 +156,11 @@ export function createInitialState() {
     banner: { text: STAGES[0].name, sub: STAGES[0].title, time: 2.4 },
     player: {
       x: WIDTH / 2 - PLAYER_W / 2,
-      y: HEIGHT - 56,
+      y: PLAYER_SPAWN_Y,
       fireCd: 0,
     },
+    respawnTimer: 0,
+    spawning: false,
     playerBullets: [],
     enemyBullets: [],
     enemies: [],
@@ -173,6 +177,7 @@ export function createInitialState() {
 }
 
 function tryFirePlayer(state) {
+  if (state.respawnTimer > 0 || state.spawning) return
   if (state.player.fireCd > 0 || state.playerBullets.length >= MAX_PLAYER_BULLETS) return
   const cx = state.player.x + PLAYER_W / 2
   const y = state.player.y
@@ -192,29 +197,32 @@ function tryFirePlayer(state) {
 
 function useBomb(state) {
   if (state.bombs <= 0 || state.bombTimer > 0 || state.status !== 'playing') return
-  if (state.phase === 'intro' || state.phase === 'clear') return
+  if (state.phase === 'intro' || state.phase === 'clear' || state.respawnTimer > 0) return
   state.bombs -= 1
   state.bombTimer = BOMB_TIME
   state.invincible = Math.max(state.invincible, 1.1)
-  state.enemyBullets = []
+  state.enemyBullets.length = 0
   explode(state, state.player.x + PLAYER_W / 2, state.player.y + PLAYER_H / 2, '#fff36b', 18)
   addScore(state, 500)
   emit(state, 'bomb')
 }
 
 function hitPlayer(state) {
-  if (state.invincible > 0 || state.bombTimer > 0) return
+  if (state.invincible > 0 || state.bombTimer > 0 || state.respawnTimer > 0) return
   state.lives -= 1
-  state.invincible = INVINCIBLE_TIME
   state.combo = 0
-  state.shake = 0.28
-  state.enemyBullets = []
-  explode(state, state.player.x + PLAYER_W / 2, state.player.y + PLAYER_H / 2, '#ff4d6d', 14)
-  emit(state, 'hurt')
+  state.shake = 0.4
+  state.enemyBullets.length = 0
+  explode(state, state.player.x + PLAYER_W / 2, state.player.y + PLAYER_H / 2, '#ff4d6d', 20)
+  emit(state, 'playerExplode')
   if (state.lives <= 0) {
+    state.respawnTimer = 0.5
     state.status = 'gameOver'
     emit(state, 'over')
+    return
   }
+  state.respawnTimer = RESPAWN_DELAY
+  state.spawning = false
 }
 
 function destroyEnemy(state, enemy) {
@@ -447,6 +455,16 @@ export function updateGame(state, dt, input) {
     if (state.comboTimer <= 0) state.combo = 0
   }
 
+  if (state.respawnTimer > 0) {
+    state.respawnTimer = Math.max(0, state.respawnTimer - dt)
+    if (state.respawnTimer <= 0 && state.status === 'playing') {
+      state.player.x = WIDTH / 2 - PLAYER_W / 2
+      state.player.y = HEIGHT + 10
+      state.spawning = true
+      state.invincible = INVINCIBLE_TIME
+    }
+  }
+
   if (state.phase === 'intro') state.introTimer -= dt
   if (state.phase === 'clear') {
     state.clearTimer -= dt
@@ -459,7 +477,15 @@ export function updateGame(state, dt, input) {
     return state
   }
 
-  if (typeof input.dragX === 'number' && typeof input.dragY === 'number') {
+  if (state.respawnTimer > 0) {
+    // 폭발 중에는 조작 불가
+  } else if (state.spawning) {
+    state.player.y -= 150 * dt
+    if (state.player.y <= PLAYER_SPAWN_Y) {
+      state.player.y = PLAYER_SPAWN_Y
+      state.spawning = false
+    }
+  } else if (typeof input.dragX === 'number' && typeof input.dragY === 'number') {
     state.player.x = clamp(input.dragX - PLAYER_W / 2, 2, WIDTH - PLAYER_W - 2)
     state.player.y = clamp(input.dragY - PLAYER_H / 2, 24, HEIGHT - PLAYER_H - 4)
   } else {
@@ -549,29 +575,30 @@ export function updateGame(state, dt, input) {
   const pc = playerCenter(state)
   const hitR2 = HIT_RADIUS * HIT_RADIUS
   const grazeR2 = GRAZE_RADIUS * GRAZE_RADIUS
-  for (let i = state.enemyBullets.length - 1; i >= 0; i--) {
-    const b = state.enemyBullets[i]
-    const d2 = dist2(pc.x, pc.y, b.x, b.y)
-    const rr = (b.r + HIT_RADIUS)
-    if (d2 <= rr * rr) {
-      state.enemyBullets.splice(i, 1)
-      hitPlayer(state)
-      if (state.status === 'gameOver') return state
-      continue
+  if (state.respawnTimer <= 0) {
+    for (let i = state.enemyBullets.length - 1; i >= 0; i--) {
+      const b = state.enemyBullets[i]
+      if (!b) break
+      const d2 = dist2(pc.x, pc.y, b.x, b.y)
+      const rr = (b.r + HIT_RADIUS)
+      if (d2 <= rr * rr) {
+        hitPlayer(state)
+        break
+      }
+      if (!b.grazed && d2 < grazeR2) {
+        b.grazed = true
+        state.graze += 1
+        addScore(state, 10)
+      }
     }
-    if (!b.grazed && d2 < grazeR2) {
-      b.grazed = true
-      state.graze += 1
-      addScore(state, 10)
-    }
-  }
 
-  for (const e of state.enemies) {
-    const ex = clamp(pc.x, e.x, e.x + e.w)
-    const ey = clamp(pc.y, e.y, e.y + e.h)
-    if (dist2(pc.x, pc.y, ex, ey) <= hitR2) {
-      hitPlayer(state)
-      if (state.status === 'gameOver') return state
+    for (const e of state.enemies) {
+      const ex = clamp(pc.x, e.x, e.x + e.w)
+      const ey = clamp(pc.y, e.y, e.y + e.h)
+      if (dist2(pc.x, pc.y, ex, ey) <= hitR2) {
+        hitPlayer(state)
+        if (state.status === 'gameOver') return state
+      }
     }
   }
 
