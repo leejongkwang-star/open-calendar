@@ -1,7 +1,10 @@
 import {
   BOMB_TIME,
   BOMBS,
+  BULLET_H,
+  BULLET_W,
   ENEMY_DEFS,
+  ENEMY_HURT_PAD,
   EXTRA_LIFE_SCORES,
   FIRE_COOLDOWN,
   FOCUS_SPEED,
@@ -63,6 +66,7 @@ function spawnEnemy(state, type, x, y, path = 'sine') {
     angle: Math.PI / 2,
     spin: (Math.random() < 0.5 ? 1 : -1) * (1.6 + state.stage * 0.18),
     phase: 0,
+    flash: 0,
     originX: x,
     originY: y,
   })
@@ -76,6 +80,11 @@ function nextExtraLife(state) {
   return EXTRA_LIFE_SCORES.find((s) => s > (state.lastExtraAt || 0)) || null
 }
 
+function emit(state, type) {
+  if (!state.events) state.events = []
+  state.events.push(type)
+}
+
 function addScore(state, points) {
   state.score += points
   const extra = nextExtraLife(state)
@@ -83,6 +92,7 @@ function addScore(state, points) {
     state.lives += 1
     state.lastExtraAt = extra
     state.banner = { text: '1UP', sub: '', time: 1.2 }
+    emit(state, 'clear')
   }
 }
 
@@ -107,6 +117,7 @@ function startStage(state, stage) {
   state.stageTime = 0
   state.spawnAcc = 0
   state.waveAcc = 0
+  state.rainAcc = 0
   state.phase = 'intro'
   state.introTimer = 2.4
   state.clearTimer = 0
@@ -114,6 +125,7 @@ function startStage(state, stage) {
   state.enemies = []
   state.enemyBullets = []
   state.banner = { text: meta.name, sub: meta.title, time: 2.4 }
+  emit(state, 'stage')
 }
 
 export function createInitialState() {
@@ -127,6 +139,7 @@ export function createInitialState() {
     clearTimer: 0,
     spawnAcc: 0,
     waveAcc: 0,
+    rainAcc: 0,
     bossSpawned: false,
     score: 0,
     lastExtraAt: 0,
@@ -148,6 +161,7 @@ export function createInitialState() {
     enemyBullets: [],
     enemies: [],
     particles: [],
+    events: ['stage'],
     stars: Array.from({ length: 48 }, (_, i) => ({
       x: (i * 53) % WIDTH,
       y: (i * 89) % HEIGHT,
@@ -173,6 +187,7 @@ function tryFirePlayer(state) {
     })
   })
   state.player.fireCd = FIRE_COOLDOWN
+  emit(state, 'shoot')
 }
 
 function useBomb(state) {
@@ -184,6 +199,7 @@ function useBomb(state) {
   state.enemyBullets = []
   explode(state, state.player.x + PLAYER_W / 2, state.player.y + PLAYER_H / 2, '#fff36b', 18)
   addScore(state, 500)
+  emit(state, 'bomb')
 }
 
 function hitPlayer(state) {
@@ -194,8 +210,10 @@ function hitPlayer(state) {
   state.shake = 0.28
   state.enemyBullets = []
   explode(state, state.player.x + PLAYER_W / 2, state.player.y + PLAYER_H / 2, '#ff4d6d', 14)
+  emit(state, 'hurt')
   if (state.lives <= 0) {
     state.status = 'gameOver'
+    emit(state, 'over')
   }
 }
 
@@ -206,6 +224,7 @@ function destroyEnemy(state, enemy) {
   state.combo += 1
   state.comboTimer = 2.2
   explode(state, enemy.x + enemy.w / 2, enemy.y + enemy.h / 2, def.colors[0], enemy.type === 'boss' ? 22 : 10)
+  emit(state, 'explode')
 }
 
 function playerCenter(state) {
@@ -327,7 +346,6 @@ function spawnWave(state) {
   } else if (s === 2) {
     spawnEnemy(state, 'drone', 30 + Math.random() * 190, y, 'dive')
     spawnEnemy(state, pick('fan', 'drone'), 50 + Math.random() * 160, y, 'sine')
-    rain(state, 70 + s * 6, bulletColor(s), 6)
   } else if (s === 3) {
     spawnEnemy(state, 'spinner', 48, y, 'hover')
     spawnEnemy(state, 'spinner', WIDTH - 64, y, 'hover')
@@ -379,6 +397,7 @@ function advancePhase(state) {
         state.clearTimer = 1.8
         addScore(state, state.stage * 1500)
         state.banner = { text: 'STAGE CLEAR', sub: `+${state.stage * 1500}`, time: 1.8 }
+        emit(state, 'clear')
       }
     }
     return
@@ -388,6 +407,7 @@ function advancePhase(state) {
     state.clearTimer = 2.0
     addScore(state, state.stage * 2500)
     state.banner = { text: 'STAGE CLEAR', sub: `+${state.stage * 2500}`, time: 1.8 }
+    emit(state, 'clear')
   }
   if (state.phase === 'clear' && state.clearTimer <= 0) {
     if (state.stage >= MAX_STAGES) {
@@ -466,13 +486,49 @@ export function updateGame(state, dt, input) {
         state.waveAcc = 0
         spawnWave(state)
       }
+      if (state.stage === 2 || state.stage === 7) {
+        state.rainAcc = (state.rainAcc || 0) + dt
+        if (state.rainAcc >= 1.8 && state.stageTime < STAGES[state.stage - 1].length) {
+          state.rainAcc = 0
+          rain(state, 64 + state.stage * 4, bulletColor(state.stage), state.stage === 2 ? 5 : 7)
+        }
+      }
     }
   }
 
-  state.playerBullets = state.playerBullets.filter((b) => {
+  for (let i = state.playerBullets.length - 1; i >= 0; i--) {
+    const b = state.playerBullets[i]
+    const prevY = b.y
     b.y += b.vy * dt
-    return b.y > -10
-  })
+    if (b.y < -16) {
+      state.playerBullets.splice(i, 1)
+      continue
+    }
+    const left = b.x - BULLET_W / 2
+    const right = b.x + BULLET_W / 2
+    const top = Math.min(prevY, b.y) - BULLET_H / 2
+    const bottom = Math.max(prevY, b.y) + BULLET_H / 2
+    let hit = false
+    for (let j = state.enemies.length - 1; j >= 0; j--) {
+      const e = state.enemies[j]
+      const ex = e.x - ENEMY_HURT_PAD
+      const ey = e.y - ENEMY_HURT_PAD
+      const ew = e.w + ENEMY_HURT_PAD * 2
+      const eh = e.h + ENEMY_HURT_PAD * 2
+      if (right < ex || left > ex + ew || bottom < ey || top > ey + eh) continue
+      state.playerBullets.splice(i, 1)
+      e.hp -= 1
+      e.flash = 0.1
+      emit(state, 'hit')
+      if (e.hp <= 0) {
+        destroyEnemy(state, e)
+        state.enemies.splice(j, 1)
+      }
+      hit = true
+      break
+    }
+    if (hit) continue
+  }
 
   state.enemyBullets.forEach((b) => {
     b.x += b.vx * dt
@@ -482,6 +538,7 @@ export function updateGame(state, dt, input) {
 
   for (let i = state.enemies.length - 1; i >= 0; i--) {
     const enemy = state.enemies[i]
+    if (enemy.flash > 0) enemy.flash = Math.max(0, enemy.flash - dt)
     moveEnemy(enemy, dt, state.stage)
     if (state.phase !== 'intro') fireEnemy(state, enemy, dt)
     if (enemy.y > HEIGHT + 30 || enemy.x < -40 || enemy.x > WIDTH + 40) {
@@ -490,22 +547,6 @@ export function updateGame(state, dt, input) {
   }
 
   const pc = playerCenter(state)
-
-  for (let i = state.playerBullets.length - 1; i >= 0; i--) {
-    const b = state.playerBullets[i]
-    for (let j = state.enemies.length - 1; j >= 0; j--) {
-      const e = state.enemies[j]
-      if (b.x < e.x || b.x > e.x + e.w || b.y < e.y || b.y > e.y + e.h) continue
-      state.playerBullets.splice(i, 1)
-      e.hp -= 1
-      if (e.hp <= 0) {
-        destroyEnemy(state, e)
-        state.enemies.splice(j, 1)
-      }
-      break
-    }
-  }
-
   const hitR2 = HIT_RADIUS * HIT_RADIUS
   const grazeR2 = GRAZE_RADIUS * GRAZE_RADIUS
   for (let i = state.enemyBullets.length - 1; i >= 0; i--) {

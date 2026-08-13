@@ -8,10 +8,13 @@ export const FOCUS_SPEED = 78
 export const HIT_RADIUS = 2.6
 export const GRAZE_RADIUS = 11
 
-export const PLAYER_BULLET_SPEED = 420
-export const FIRE_COOLDOWN = 0.11
-export const MAX_PLAYER_BULLETS = 14
-export const MAX_ENEMY_BULLETS = 520
+export const PLAYER_BULLET_SPEED = 360
+export const FIRE_COOLDOWN = 0.1
+export const MAX_PLAYER_BULLETS = 18
+export const MAX_ENEMY_BULLETS = 280
+export const BULLET_W = 5
+export const BULLET_H = 10
+export const ENEMY_HURT_PAD = 4
 
 export const LIVES = 4
 export const BOMBS = 3
@@ -34,14 +37,14 @@ export const PALETTE = {
 }
 
 export const ENEMY_DEFS = {
-  drone: { hp: 6, score: 200, w: 14, h: 14, colors: ['#ff5d5d', '#ffd15a'] },
-  fan: { hp: 10, score: 350, w: 16, h: 14, colors: ['#5dff8a', '#d6ff7a'] },
-  spinner: { hp: 16, score: 500, w: 16, h: 16, colors: ['#c45dff', '#ffa6ff'] },
-  gunner: { hp: 18, score: 600, w: 18, h: 14, colors: ['#5dd6ff', '#ffe08a'] },
-  sniper: { hp: 8, score: 400, w: 12, h: 16, colors: ['#ff8a3d', '#fff1a8'] },
-  tank: { hp: 28, score: 900, w: 20, h: 18, colors: ['#8a8a8a', '#ffe066'] },
-  midboss: { hp: 120, score: 5000, w: 36, h: 28, colors: ['#ff4d8d', '#fff36b'] },
-  boss: { hp: 220, score: 15000, w: 48, h: 36, colors: ['#ff2d55', '#7af7ff'] },
+  drone: { hp: 3, score: 200, w: 16, h: 16, colors: ['#ff5d5d', '#ffd15a'] },
+  fan: { hp: 5, score: 350, w: 18, h: 16, colors: ['#5dff8a', '#d6ff7a'] },
+  spinner: { hp: 8, score: 500, w: 18, h: 18, colors: ['#c45dff', '#ffa6ff'] },
+  gunner: { hp: 10, score: 600, w: 20, h: 16, colors: ['#5dd6ff', '#ffe08a'] },
+  sniper: { hp: 4, score: 400, w: 14, h: 18, colors: ['#ff8a3d', '#fff1a8'] },
+  tank: { hp: 16, score: 900, w: 22, h: 20, colors: ['#8a8a8a', '#ffe066'] },
+  midboss: { hp: 90, score: 5000, w: 40, h: 30, colors: ['#ff4d8d', '#fff36b'] },
+  boss: { hp: 160, score: 15000, w: 52, h: 38, colors: ['#ff2d55', '#7af7ff'] },
 }
 
 export const STAGES = [

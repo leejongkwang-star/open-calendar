@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Pause, Play, RotateCcw, Trophy } from 'lucide-react'
+import { Pause, Play, RotateCcw, Volume2, VolumeX } from 'lucide-react'
 import { gamesAPI } from '../../api/games'
 import { HEIGHT, MAX_STAGES, WIDTH } from './galaga/constants'
+import { drainEvents, unlockAudio } from './galaga/audio'
 import { createInitialState, updateGame } from './galaga/engine'
 import { renderGame } from './galaga/render'
 
@@ -25,6 +26,8 @@ function GalagaLite() {
   const lastTimeRef = useRef(0)
   const savedScoreRef = useRef(false)
   const isPausedRef = useRef(false)
+  const hudAccRef = useRef(0)
+  const soundOnRef = useRef(true)
 
   const [gameStarted, setGameStarted] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
@@ -35,8 +38,8 @@ function GalagaLite() {
   const [lives, setLives] = useState(4)
   const [bombs, setBombs] = useState(3)
   const [stage, setStage] = useState(1)
-  const [combo, setCombo] = useState(0)
   const [graze, setGraze] = useState(0)
+  const [soundOn, setSoundOn] = useState(true)
 
   useEffect(() => {
     const loadBestScore = async () => {
@@ -55,7 +58,6 @@ function GalagaLite() {
     setLives(state.lives)
     setBombs(state.bombs)
     setStage(state.stage)
-    setCombo(state.combo)
     setGraze(state.graze)
   }, [])
 
@@ -117,12 +119,21 @@ function GalagaLite() {
         dragY: input.dragY,
       })
       input.bomb = false
-      syncHud(state)
+      if (soundOnRef.current) drainEvents(state)
+      else if (state.events) state.events.length = 0
+
+      hudAccRef.current += dt
+      if (hudAccRef.current >= 0.15) {
+        hudAccRef.current = 0
+        syncHud(state)
+      }
 
       if (state.status === 'gameOver') {
+        syncHud(state)
         setGameOver(true)
         saveScoreIfNeeded(state.score, state)
       } else if (state.status === 'cleared') {
+        syncHud(state)
         setCleared(true)
         setGameOver(true)
         saveScoreIfNeeded(state.score, state)
@@ -247,6 +258,7 @@ function GalagaLite() {
   }
 
   const startGame = () => {
+    unlockAudio()
     stopLoop()
     savedScoreRef.current = false
     stateRef.current = createInitialState()
@@ -270,7 +282,6 @@ function GalagaLite() {
     setLives(4)
     setBombs(3)
     setStage(1)
-    setCombo(0)
     setGraze(0)
     setGameOver(false)
     setCleared(false)
@@ -292,7 +303,6 @@ function GalagaLite() {
     setLives(4)
     setBombs(3)
     setStage(1)
-    setCombo(0)
     setGraze(0)
     savedScoreRef.current = false
     const canvas = canvasRef.current
@@ -310,13 +320,13 @@ function GalagaLite() {
         8-BIT DANMAKU · 탄막 사이를 피하며 8스테이지를 돌파하세요
       </p>
 
-      <div className="flex flex-col sm:flex-row gap-4 mb-4 items-start">
-        <div className="relative mx-auto">
+      <div className="w-full max-w-md mb-4">
+        <div className="relative mx-auto w-fit">
           <canvas
             ref={canvasRef}
             width={WIDTH}
             height={HEIGHT}
-            className="rounded-sm shadow-lg border-4 border-gray-800 bg-black touch-none max-w-full"
+            className="rounded-sm shadow-lg border-2 border-zinc-700 bg-black touch-none max-w-full"
             style={{
               width: 'min(100%, 384px)',
               aspectRatio: `${WIDTH} / ${HEIGHT}`,
@@ -373,35 +383,23 @@ function GalagaLite() {
           )}
         </div>
 
-        <div className="flex sm:flex-col gap-2 w-full sm:w-40 justify-center font-mono">
-          <div className="bg-gray-900 text-yellow-300 px-4 py-2 rounded-sm flex-1 border border-gray-700">
-            <div className="text-[10px] text-gray-400">SCORE</div>
-            <div className="text-lg font-bold">{score.toLocaleString()}</div>
+        <div className="mt-3 grid grid-cols-4 gap-2 text-center font-mono text-xs">
+          <div className="rounded bg-zinc-900 px-2 py-2 border border-zinc-700">
+            <div className="text-[10px] text-zinc-500">SCORE</div>
+            <div className="text-yellow-300 font-bold tabular-nums">{Math.floor(score).toLocaleString()}</div>
           </div>
-          <div className="bg-gray-900 text-white px-4 py-2 rounded-sm flex-1 border border-gray-700">
-            <div className="text-[10px] text-gray-400 flex items-center gap-1">
-              <Trophy className="w-3 h-3" /> BEST
-            </div>
-            <div className="text-lg font-bold">{Math.floor(bestScore).toLocaleString()}</div>
+          <div className="rounded bg-zinc-900 px-2 py-2 border border-zinc-700">
+            <div className="text-[10px] text-zinc-500">BEST</div>
+            <div className="text-white font-bold tabular-nums">{Math.floor(bestScore).toLocaleString()}</div>
           </div>
-          <div className="bg-gray-900 text-white px-4 py-2 rounded-sm flex-1 border border-gray-700">
-            <div className="text-[10px] text-gray-400">STAGE</div>
-            <div className="text-lg font-bold">{stage} / {MAX_STAGES}</div>
+          <div className="rounded bg-zinc-900 px-2 py-2 border border-zinc-700">
+            <div className="text-[10px] text-zinc-500">STAGE</div>
+            <div className="text-white font-bold">{stage}/{MAX_STAGES}</div>
           </div>
-          <div className="bg-gray-900 text-white px-4 py-2 rounded-sm flex-1 border border-gray-700">
-            <div className="text-[10px] text-gray-400">LIFE / BOMB</div>
-            <div className="text-lg font-bold">{lives} / {bombs}</div>
+          <div className="rounded bg-zinc-900 px-2 py-2 border border-zinc-700">
+            <div className="text-[10px] text-zinc-500">LIFE·BOMB</div>
+            <div className="text-white font-bold">{lives} / {bombs}</div>
           </div>
-          <div className="bg-gray-900 text-cyan-300 px-4 py-2 rounded-sm flex-1 border border-gray-700">
-            <div className="text-[10px] text-gray-400">GRAZE</div>
-            <div className="text-lg font-bold">{graze}</div>
-          </div>
-          {combo > 1 && (
-            <div className="bg-amber-600 text-white px-4 py-2 rounded-sm flex-1">
-              <div className="text-[10px]">COMBO</div>
-              <div className="text-lg font-bold">x{combo}</div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -433,6 +431,18 @@ function GalagaLite() {
               className="px-4 py-2 bg-amber-500 text-black rounded-sm hover:bg-amber-400 font-bold"
             >
               BOMB
+            </button>
+            <button
+              onClick={() => {
+                const next = !soundOnRef.current
+                soundOnRef.current = next
+                setSoundOn(next)
+                if (next) unlockAudio()
+              }}
+              className="p-2 bg-gray-700 text-white rounded-sm hover:bg-gray-600"
+              aria-label={soundOn ? '사운드 끄기' : '사운드 켜기'}
+            >
+              {soundOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
             </button>
           </>
         )}

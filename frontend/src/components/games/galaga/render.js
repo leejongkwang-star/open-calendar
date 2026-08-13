@@ -1,4 +1,6 @@
 import {
+  BULLET_H,
+  BULLET_W,
   ENEMY_DEFS,
   HEIGHT,
   HIT_RADIUS,
@@ -43,8 +45,8 @@ function drawEnemyShip(ctx, enemy) {
   const [c1, c2] = def.colors
 
   if (enemy.type === 'boss' || enemy.type === 'midboss') {
-    px(ctx, x + 4, y + 6, w - 8, h - 10, c1)
-    px(ctx, x, y + 10, w, 6, c2)
+    px(ctx, x + 4, y + 6, w - 8, h - 10, enemy.flash > 0 ? '#ffffff' : c1)
+    px(ctx, x, y + 10, w, 6, enemy.flash > 0 ? '#fff6c2' : c2)
     px(ctx, x + w / 2 - 4, y, 8, 8, '#ffffff')
     px(ctx, x + 2, y + h - 8, 8, 8, c1)
     px(ctx, x + w - 10, y + h - 8, 8, 8, c1)
@@ -54,8 +56,8 @@ function drawEnemyShip(ctx, enemy) {
     return
   }
 
-  px(ctx, x + 2, y, w - 4, h - 2, c1)
-  px(ctx, x, y + 4, w, 4, c2)
+  px(ctx, x + 2, y, w - 4, h - 2, enemy.flash > 0 ? '#ffffff' : c1)
+  px(ctx, x, y + 4, w, 4, enemy.flash > 0 ? '#fff6c2' : c2)
   px(ctx, x + w / 2 - 2, y + 2, 4, 4, '#ffffff')
   if (enemy.type === 'spinner') {
     const t = Math.floor(enemy.t * 8) % 2
@@ -102,8 +104,8 @@ export function renderGame(ctx, state, { focus = false } = {}) {
   })
 
   state.playerBullets.forEach((b) => {
-    px(ctx, b.x - 1, b.y - 4, 3, 8, PALETTE.pBullet)
-    px(ctx, b.x, b.y - 5, 1, 3, '#ffffff')
+    px(ctx, b.x - BULLET_W / 2, b.y - BULLET_H / 2, BULLET_W, BULLET_H, PALETTE.pBullet)
+    px(ctx, b.x - 1, b.y - BULLET_H / 2 - 2, 2, 3, '#ffffff')
   })
 
   const blink = state.invincible > 0 && Math.floor(state.invincible * 12) % 2 === 0
@@ -118,23 +120,48 @@ export function renderGame(ctx, state, { focus = false } = {}) {
 
   ctx.restore()
 
-  ctx.fillStyle = '#000000'
-  ctx.fillRect(0, 0, WIDTH, 16)
-  ctx.fillStyle = PALETTE.hud
-  ctx.font = '8px monospace'
-  ctx.textBaseline = 'top'
-  ctx.fillText(`SC ${Math.floor(state.score).toString().padStart(8, '0')}`, 4, 4)
-  ctx.fillText(`${state.stage}/${MAX_STAGES}`, WIDTH - 28, 4)
+  ctx.fillStyle = 'rgba(0,0,0,0.72)'
+  ctx.fillRect(0, 0, WIDTH, 18)
+  ctx.fillRect(0, HEIGHT - 16, WIDTH, 16)
 
-  let lx = 4
+  ctx.fillStyle = '#ffe566'
+  ctx.font = 'bold 9px monospace'
+  ctx.textBaseline = 'top'
+  ctx.textAlign = 'left'
+  ctx.fillText(Math.floor(state.score).toString().padStart(8, '0'), 6, 5)
+  ctx.fillStyle = '#9aa4c2'
+  ctx.font = '8px monospace'
+  ctx.fillText(`GRAZE ${state.graze}`, 86, 6)
+  ctx.textAlign = 'right'
+  ctx.fillStyle = '#ffffff'
+  ctx.fillText(`STAGE ${state.stage}/${MAX_STAGES}`, WIDTH - 6, 5)
+  ctx.textAlign = 'left'
+
+  ctx.fillStyle = '#9aa4c2'
+  ctx.font = '8px monospace'
+  ctx.fillText('L', 6, HEIGHT - 12)
+  let lx = 16
   for (let i = 0; i < state.lives; i++) {
-    px(ctx, lx, HEIGHT - 10, 6, 6, PALETTE.player[0])
-    lx += 8
+    px(ctx, lx, HEIGHT - 11, 7, 7, PALETTE.player[0])
+    px(ctx, lx + 2, HEIGHT - 9, 3, 3, '#ffffff')
+    lx += 10
   }
-  let bx = WIDTH - 10
+  ctx.fillStyle = '#9aa4c2'
+  ctx.textAlign = 'right'
+  ctx.fillText('B', WIDTH - 6 - state.bombs * 10, HEIGHT - 12)
+  ctx.textAlign = 'left'
+  let bx = WIDTH - 13
   for (let i = 0; i < state.bombs; i++) {
-    px(ctx, bx, HEIGHT - 10, 6, 6, '#ffe566')
-    bx -= 8
+    px(ctx, bx, HEIGHT - 11, 7, 7, '#ffe566')
+    bx -= 10
+  }
+
+  if (state.combo > 1) {
+    ctx.textAlign = 'center'
+    ctx.fillStyle = '#ffe566'
+    ctx.font = 'bold 9px monospace'
+    ctx.fillText(`x${state.combo}`, WIDTH / 2, HEIGHT - 12)
+    ctx.textAlign = 'left'
   }
 
   if (state.banner && state.banner.time > 0) {
