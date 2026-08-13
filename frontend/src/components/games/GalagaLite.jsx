@@ -21,6 +21,10 @@ function GalagaLite() {
     dragY: null,
     autoFire: false,
     dragging: false,
+    dragDx: 0,
+    dragDy: 0,
+    touchX: 0,
+    touchY: 0,
   })
   const rafRef = useRef(null)
   const lastTimeRef = useRef(0)
@@ -118,8 +122,12 @@ function GalagaLite() {
           bomb: input.bomb,
           dragX: input.dragX,
           dragY: input.dragY,
+          dragDx: input.dragDx,
+          dragDy: input.dragDy,
         })
         input.bomb = false
+        input.dragDx = 0
+        input.dragDy = 0
         if (soundOnRef.current) drainEvents(state)
         else if (state.events) state.events.length = 0
 
@@ -214,7 +222,7 @@ function GalagaLite() {
     const rect = canvas.getBoundingClientRect()
     return {
       x: (clientX - rect.left) * (WIDTH / rect.width),
-      y: (clientY - rect.top) * (HEIGHT / rect.height) - 28,
+      y: (clientY - rect.top) * (HEIGHT / rect.height),
     }
   }
 
@@ -227,9 +235,11 @@ function GalagaLite() {
       inputRef.current.dragging = true
       const pos = getGamePos(e.clientX, e.clientY)
       if (pos) {
-        inputRef.current.dragX = pos.x
-        inputRef.current.dragY = pos.y
+        inputRef.current.touchX = pos.x
+        inputRef.current.touchY = pos.y
       }
+      inputRef.current.dragDx = 0
+      inputRef.current.dragDy = 0
       try {
         e.currentTarget.setPointerCapture(e.pointerId)
       } catch {
@@ -245,17 +255,18 @@ function GalagaLite() {
     if (!inputRef.current.dragging) return
     e.preventDefault()
     const pos = getGamePos(e.clientX, e.clientY)
-    if (pos) {
-      inputRef.current.dragX = pos.x
-      inputRef.current.dragY = pos.y
-    }
+    if (!pos) return
+    inputRef.current.dragDx += pos.x - inputRef.current.touchX
+    inputRef.current.dragDy += pos.y - inputRef.current.touchY
+    inputRef.current.touchX = pos.x
+    inputRef.current.touchY = pos.y
   }
 
   const handlePointerUp = () => {
     if (inputRef.current.dragging) {
       inputRef.current.dragging = false
-      inputRef.current.dragX = null
-      inputRef.current.dragY = null
+      inputRef.current.dragDx = 0
+      inputRef.current.dragDy = 0
     } else {
       inputRef.current.fire = false
     }
@@ -279,6 +290,10 @@ function GalagaLite() {
       bomb: false,
       dragX: null,
       dragY: null,
+      dragDx: 0,
+      dragDy: 0,
+      touchX: 0,
+      touchY: 0,
       autoFire: touchDevice,
       dragging: false,
     }
@@ -461,7 +476,7 @@ function GalagaLite() {
       <p className="text-xs text-gray-400 text-center max-w-md leading-relaxed">
         PC: 방향키/WASD 이동 · Shift 저속(히트박스) · Z/Space 발사 · X 봄 · P 일시정지
         <br />
-        모바일: 드래그로 전방향 이동 + 자동연사 · BOMB 버튼으로 탄막 제거
+        모바일: 화면 아무 곳이나 잡고 밀면 기체가 따라갑니다. 손가락은 아래, 비행기는 위에 두고 조작하세요.
       </p>
     </div>
   )

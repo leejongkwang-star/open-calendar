@@ -485,6 +485,9 @@ export function updateGame(state, dt, input) {
       state.player.y = PLAYER_SPAWN_Y
       state.spawning = false
     }
+  } else if (typeof input.dragDx === 'number' && (input.dragDx !== 0 || input.dragDy !== 0)) {
+    state.player.x = clamp(state.player.x + input.dragDx, 2, WIDTH - PLAYER_W - 2)
+    state.player.y = clamp(state.player.y + input.dragDy, 24, HEIGHT - PLAYER_H - 4)
   } else if (typeof input.dragX === 'number' && typeof input.dragY === 'number') {
     state.player.x = clamp(input.dragX - PLAYER_W / 2, 2, WIDTH - PLAYER_W - 2)
     state.player.y = clamp(input.dragY - PLAYER_H / 2, 24, HEIGHT - PLAYER_H - 4)
