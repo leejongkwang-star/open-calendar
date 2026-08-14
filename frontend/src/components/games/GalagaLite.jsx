@@ -334,20 +334,19 @@ function GalagaLite() {
 
   return (
     <div className="flex flex-col items-center">
-      <h2 className="text-2xl font-bold mb-1 tracking-wide">탄막 슈팅</h2>
-      <p className="text-sm text-gray-500 mb-4 text-center">
+      <h2 className="text-xl sm:text-2xl font-bold mb-1 tracking-wide">탄막 슈팅</h2>
+      <p className="text-xs sm:text-sm text-gray-500 mb-2 sm:mb-4 text-center">
         8-BIT DANMAKU · 탄막 사이를 피하며 8스테이지를 돌파하세요
       </p>
 
-      <div className="w-full max-w-md mb-4">
-        <div className="relative mx-auto w-fit">
+      <div className="w-full mb-3">
+        <div className="relative mx-auto w-full max-w-[560px]">
           <canvas
             ref={canvasRef}
             width={WIDTH}
             height={HEIGHT}
-            className="rounded-sm shadow-lg border-2 border-zinc-700 bg-black touch-none max-w-full"
+            className="rounded-sm shadow-lg border-2 border-zinc-700 bg-black touch-none w-full"
             style={{
-              width: 'min(100%, 384px)',
               aspectRatio: `${WIDTH} / ${HEIGHT}`,
               touchAction: 'none',
               imageRendering: 'pixelated',

@@ -200,10 +200,30 @@ function useBomb(state) {
   if (state.phase === 'intro' || state.phase === 'clear' || state.respawnTimer > 0) return
   state.bombs -= 1
   state.bombTimer = BOMB_TIME
-  state.invincible = Math.max(state.invincible, 1.1)
+  state.invincible = Math.max(state.invincible, 1.4)
+  state.shake = 0.55
   state.enemyBullets.length = 0
-  explode(state, state.player.x + PLAYER_W / 2, state.player.y + PLAYER_H / 2, '#fff36b', 18)
-  addScore(state, 500)
+
+  for (let i = state.enemies.length - 1; i >= 0; i--) {
+    const enemy = state.enemies[i]
+    if (enemy.type === 'boss' || enemy.type === 'midboss') {
+      enemy.hp -= Math.ceil(enemy.maxHp * 0.4)
+      enemy.flash = 0.25
+      if (enemy.hp <= 0) {
+        destroyEnemy(state, enemy, true)
+        state.enemies.splice(i, 1)
+      }
+    } else {
+      destroyEnemy(state, enemy, true)
+      state.enemies.splice(i, 1)
+    }
+  }
+
+  for (let i = 0; i < 28; i++) {
+    explode(state, Math.random() * WIDTH, Math.random() * HEIGHT, i % 2 ? '#fff36b' : '#ff9f1c', 4)
+  }
+  explode(state, WIDTH / 2, HEIGHT / 2, '#ffffff', 20)
+  addScore(state, 800)
   emit(state, 'bomb')
 }
 
@@ -225,14 +245,14 @@ function hitPlayer(state) {
   state.spawning = false
 }
 
-function destroyEnemy(state, enemy) {
+function destroyEnemy(state, enemy, silent = false) {
   const def = ENEMY_DEFS[enemy.type]
   const comboBonus = Math.max(0, state.combo) * 20
   addScore(state, def.score + comboBonus)
   state.combo += 1
   state.comboTimer = 2.2
   explode(state, enemy.x + enemy.w / 2, enemy.y + enemy.h / 2, def.colors[0], enemy.type === 'boss' ? 22 : 10)
-  emit(state, 'explode')
+  if (!silent) emit(state, 'explode')
 }
 
 function playerCenter(state) {

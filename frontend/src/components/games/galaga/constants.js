@@ -19,7 +19,7 @@ export const ENEMY_HURT_PAD = 4
 export const LIVES = 4
 export const BOMBS = 3
 export const INVINCIBLE_TIME = 2.4
-export const BOMB_TIME = 0.85
+export const BOMB_TIME = 1.05
 export const RESPAWN_DELAY = 0.7
 export const PLAYER_SPAWN_Y = HEIGHT - 56
 

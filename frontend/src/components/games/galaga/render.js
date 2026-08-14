@@ -1,4 +1,5 @@
 import {
+  BOMB_TIME,
   BULLET_H,
   BULLET_W,
   ENEMY_DEFS,
@@ -85,8 +86,20 @@ export function renderGame(ctx, state, { focus = false } = {}) {
   })
 
   if (state.bombTimer > 0) {
-    ctx.fillStyle = `rgba(255, 243, 107, ${state.bombTimer * 0.35})`
+    const t = Math.min(1, state.bombTimer / BOMB_TIME)
+    ctx.fillStyle = `rgba(255, 230, 80, ${0.2 + t * 0.55})`
     ctx.fillRect(0, 0, WIDTH, HEIGHT)
+    const radius = (1 - t) * Math.hypot(WIDTH, HEIGHT)
+    ctx.strokeStyle = `rgba(255,255,255,${t})`
+    ctx.lineWidth = 5
+    ctx.beginPath()
+    ctx.arc(WIDTH / 2, HEIGHT / 2, Math.max(8, radius), 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.strokeStyle = `rgba(255, 160, 40, ${t * 0.8})`
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.arc(WIDTH / 2, HEIGHT / 2, Math.max(4, radius * 0.55), 0, Math.PI * 2)
+    ctx.stroke()
   }
 
   state.particles.forEach((p) => {
