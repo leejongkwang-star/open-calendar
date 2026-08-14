@@ -45,8 +45,8 @@ export const ENEMY_DEFS = {
   gunner: { hp: 10, score: 600, w: 20, h: 16, colors: ['#5dd6ff', '#ffe08a'] },
   sniper: { hp: 4, score: 400, w: 14, h: 18, colors: ['#ff8a3d', '#fff1a8'] },
   tank: { hp: 16, score: 900, w: 22, h: 20, colors: ['#8a8a8a', '#ffe066'] },
-  midboss: { hp: 90, score: 5000, w: 40, h: 30, colors: ['#ff4d8d', '#fff36b'] },
-  boss: { hp: 160, score: 15000, w: 52, h: 38, colors: ['#ff2d55', '#7af7ff'] },
+  midboss: { hp: 90, score: 5000, w: 64, h: 44, colors: ['#c45dff', '#ffa6ff', '#fff36b', '#5b1d8a'] },
+  boss: { hp: 180, score: 15000, w: 80, h: 54, colors: ['#ff2d55', '#7af7ff', '#ffe566', '#7a1030'] },
 }
 
 export const STAGES = [

@@ -37,27 +37,80 @@ function drawSprite(ctx, map, ox, oy, colors, scale = 2) {
   }
 }
 
+const MIDBOSS_PX = [
+  '......44444444......',
+  '....441111111144....',
+  '...41112222211114...',
+  '..4112223333222114..',
+  '.4112222.33.2222114.',
+  '.1122211.33.1122211.',
+  '..1122112222112211..',
+  '...1111.2222.1111...',
+  '...4.22......22.4...',
+  '....222......222....',
+  '.....2...44...2.....',
+]
+
+const BOSS_PX = [
+  '........44444444........',
+  '......441111111144......',
+  '....4411222222221144....',
+  '...411222333333222114...',
+  '..41122223333332222114..',
+  '.4112222..3333..2222114.',
+  '.1122211..3333..1122211.',
+  '..112211.222222.112211..',
+  '...1111.22.11.22.1111...',
+  '...4.222......222.4.....',
+  '....2222.4..4.2222......',
+  '.....22..4444..22.......',
+  '......2...44...2........',
+]
+
+function drawBossSprite(ctx, enemy) {
+  const map = enemy.type === 'boss' ? BOSS_PX : MIDBOSS_PX
+  const colors = enemy.flash > 0
+    ? ['#ffffff', '#fff6c2', '#ffffff', '#ffe566']
+    : ENEMY_DEFS[enemy.type].colors
+  const scale = 2
+  const sw = map[0].length * scale
+  const sh = map.length * scale
+  const ox = Math.round(enemy.x + (enemy.w - sw) / 2)
+  const oy = Math.round(enemy.y + (enemy.h - sh) / 2)
+  const pulse = Math.floor(enemy.t * 8) % 2
+  const hull = enemy.flash > 0 ? '#ffffff' : colors[3]
+  px(ctx, Math.round(enemy.x) + 8, Math.round(enemy.y) + 8, enemy.w - 16, enemy.h - 14, hull)
+
+  if (enemy.type === 'boss') {
+    px(ctx, ox - 6, oy + 10 + pulse, 6, 4, colors[1])
+    px(ctx, ox + sw, oy + 10 + pulse, 6, 4, colors[1])
+    px(ctx, ox - 4, oy + 16, 4, 8, colors[0])
+    px(ctx, ox + sw, oy + 16, 4, 8, colors[0])
+  } else {
+    px(ctx, ox - 4, oy + 8 + pulse, 4, 4, colors[1])
+    px(ctx, ox + sw, oy + 8 + pulse, 4, 4, colors[1])
+  }
+
+  drawSprite(ctx, map, ox, oy, colors, scale)
+
+  const coreX = ox + sw / 2 - 3
+  const coreY = oy + 10
+  px(ctx, coreX, coreY, 6, 6, pulse ? '#ffffff' : colors[2])
+}
+
 function drawEnemyShip(ctx, enemy) {
+  if (enemy.type === 'boss' || enemy.type === 'midboss') {
+    drawBossSprite(ctx, enemy)
+    return
+  }
+
   const def = ENEMY_DEFS[enemy.type]
   const x = Math.round(enemy.x)
   const y = Math.round(enemy.y)
   const w = enemy.w
-  const h = enemy.h
   const [c1, c2] = def.colors
 
-  if (enemy.type === 'boss' || enemy.type === 'midboss') {
-    px(ctx, x + 4, y + 6, w - 8, h - 10, enemy.flash > 0 ? '#ffffff' : c1)
-    px(ctx, x, y + 10, w, 6, enemy.flash > 0 ? '#fff6c2' : c2)
-    px(ctx, x + w / 2 - 4, y, 8, 8, '#ffffff')
-    px(ctx, x + 2, y + h - 8, 8, 8, c1)
-    px(ctx, x + w - 10, y + h - 8, 8, 8, c1)
-    const ratio = Math.max(0, enemy.hp / enemy.maxHp)
-    px(ctx, x, y - 6, w, 3, '#2a2038')
-    px(ctx, x, y - 6, Math.round(w * ratio), 3, ratio > 0.33 ? '#7cff6b' : '#ff4d6d')
-    return
-  }
-
-  px(ctx, x + 2, y, w - 4, h - 2, enemy.flash > 0 ? '#ffffff' : c1)
+  px(ctx, x + 2, y, w - 4, enemy.h - 2, enemy.flash > 0 ? '#ffffff' : c1)
   px(ctx, x, y + 4, w, 4, enemy.flash > 0 ? '#fff6c2' : c2)
   px(ctx, x + w / 2 - 2, y + 2, 4, 4, '#ffffff')
   if (enemy.type === 'spinner') {
@@ -149,6 +202,21 @@ export function renderGame(ctx, state, { focus = false } = {}) {
   ctx.fillStyle = '#ffffff'
   ctx.fillText(`STAGE ${state.stage}/${MAX_STAGES}`, WIDTH - 6, 5)
   ctx.textAlign = 'left'
+
+  const boss = state.enemies.find((e) => e.type === 'boss' || e.type === 'midboss')
+  if (boss) {
+    const ratio = Math.max(0, boss.hp / boss.maxHp)
+    const label = boss.type === 'boss' ? 'FINAL CORE' : 'MID BOSS'
+    ctx.fillStyle = 'rgba(0,0,0,0.7)'
+    ctx.fillRect(8, 20, WIDTH - 16, 12)
+    ctx.fillStyle = '#2a2038'
+    ctx.fillRect(10, 26, WIDTH - 20, 4)
+    ctx.fillStyle = ratio > 0.33 ? '#ff4d6d' : '#ffe566'
+    ctx.fillRect(10, 26, Math.round((WIDTH - 20) * ratio), 4)
+    ctx.fillStyle = '#ffe566'
+    ctx.font = '7px monospace'
+    ctx.fillText(label, 10, 20)
+  }
 
   ctx.fillStyle = '#9aa4c2'
   ctx.font = '8px monospace'
