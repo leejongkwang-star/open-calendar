@@ -675,12 +675,68 @@ router.delete('/users/:userId', authenticate, requireAdmin, async (req, res, nex
   }
 })
 
-// 비밀번호 재설정 (직원번호 확인 후)
+const PASSWORD_RESET_APPROVAL_HOURS = 24
+
+function normalizePersonName(name) {
+  return String(name || '').trim().replace(/\s+/g, '').toLowerCase()
+}
+
+async function findActiveApprovedReset(userId) {
+  return prisma.passwordResetRequest.findFirst({
+    where: {
+      userId,
+      status: 'APPROVED',
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { reviewedAt: 'desc' },
+  })
+}
+
+// 비밀번호 변경 요청 상태 (로그인 전)
+router.get('/password-reset-status', async (req, res, next) => {
+  try {
+    const employeeNumber = String(req.query.employeeNumber || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+
+    if (!employeeNumber || employeeNumber.length !== 6) {
+      return res.status(400).json({ message: '직원번호를 입력해주세요.' })
+    }
+
+    const user = await prisma.user.findFirst({
+      where: { employeeNumber, status: 'APPROVED' },
+      select: { id: true },
+    })
+
+    if (!user) {
+      return res.json({ exists: false, resetStatus: 'none' })
+    }
+
+    const pending = await prisma.passwordResetRequest.findFirst({
+      where: { userId: user.id, status: 'PENDING' },
+    })
+    if (pending) {
+      return res.json({ exists: true, resetStatus: 'pending' })
+    }
+
+    const approved = await findActiveApprovedReset(user.id)
+    if (approved) {
+      return res.json({ exists: true, resetStatus: 'approved' })
+    }
+
+    res.json({ exists: true, resetStatus: 'none' })
+  } catch (error) {
+    next(error)
+  }
+})
+
+// 비밀번호 변경 요청 (로그인 전)
 router.post(
-  '/reset-password',
+  '/password-reset-requests',
   [
     body('employeeNumber').trim().notEmpty().withMessage('직원번호를 입력해주세요.'),
-    body('newPassword').isLength({ min: 8 }).withMessage('비밀번호는 8자 이상이어야 합니다.'),
+    body('name').trim().isLength({ min: 2 }).withMessage('이름을 입력해주세요.'),
   ],
   async (req, res, next) => {
     try {
@@ -689,27 +745,209 @@ router.post(
         return res.status(400).json({ message: errors.array()[0].msg })
       }
 
-      const { employeeNumber, newPassword } = req.body
+      const employeeNumber = String(req.body.employeeNumber).trim().toUpperCase()
+      const name = String(req.body.name).trim()
 
-      // 사용자 조회
+      const user = await prisma.user.findFirst({
+        where: { employeeNumber, status: 'APPROVED' },
+      })
+
+      const nameMatches = user && normalizePersonName(user.name) === normalizePersonName(name)
+      const genericMessage = '요청이 접수되었습니다. 관리자 승인 후 다시 비밀번호를 변경할 수 있습니다.'
+
+      if (user && nameMatches) {
+        const approved = await findActiveApprovedReset(user.id)
+        if (!approved) {
+          const pending = await prisma.passwordResetRequest.findFirst({
+            where: { userId: user.id, status: 'PENDING' },
+          })
+          if (!pending) {
+            await prisma.passwordResetRequest.create({
+              data: { userId: user.id, status: 'PENDING' },
+            })
+          }
+        }
+      }
+
+      res.json({ message: genericMessage })
+    } catch (error) {
+      next(error)
+    }
+  }
+)
+
+// 비밀번호 변경 요청 목록 (관리자)
+router.get('/password-reset-requests', authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const requests = await prisma.passwordResetRequest.findMany({
+      where: { status: { in: ['PENDING', 'APPROVED'] } },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            employeeNumber: true,
+          },
+        },
+      },
+      orderBy: { requestedAt: 'asc' },
+    })
+
+    res.json(
+      requests.map((item) => ({
+        id: item.id,
+        status: item.status,
+        requestedAt: item.requestedAt,
+        reviewedAt: item.reviewedAt,
+        expiresAt: item.expiresAt,
+        userId: item.user.id,
+        name: item.user.name,
+        employeeNumber: item.user.employeeNumber,
+      }))
+    )
+  } catch (error) {
+    next(error)
+  }
+})
+
+// 비밀번호 변경 요청 승인 (관리자)
+router.post(
+  '/password-reset-requests/:id/approve',
+  authenticate,
+  requireAdmin,
+  async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id)
+      const request = await prisma.passwordResetRequest.findUnique({ where: { id } })
+
+      if (!request || request.status !== 'PENDING') {
+        return res.status(400).json({ message: '대기 중인 요청만 승인할 수 있습니다.' })
+      }
+
+      const expiresAt = new Date(Date.now() + PASSWORD_RESET_APPROVAL_HOURS * 60 * 60 * 1000)
+
+      await prisma.passwordResetRequest.updateMany({
+        where: {
+          userId: request.userId,
+          status: 'APPROVED',
+        },
+        data: { status: 'USED' },
+      })
+
+      const updated = await prisma.passwordResetRequest.update({
+        where: { id },
+        data: {
+          status: 'APPROVED',
+          reviewedAt: new Date(),
+          reviewedBy: req.user.id,
+          expiresAt,
+        },
+      })
+
+      res.json({
+        message: '비밀번호 변경 요청을 승인했습니다. 신청자는 24시간 안에 새 비밀번호를 설정할 수 있습니다.',
+        request: updated,
+      })
+    } catch (error) {
+      next(error)
+    }
+  }
+)
+
+// 비밀번호 변경 요청 거부 (관리자)
+router.post(
+  '/password-reset-requests/:id/reject',
+  authenticate,
+  requireAdmin,
+  async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id)
+      const request = await prisma.passwordResetRequest.findUnique({ where: { id } })
+
+      if (!request || request.status !== 'PENDING') {
+        return res.status(400).json({ message: '대기 중인 요청만 거부할 수 있습니다.' })
+      }
+
+      await prisma.passwordResetRequest.update({
+        where: { id },
+        data: {
+          status: 'REJECTED',
+          reviewedAt: new Date(),
+          reviewedBy: req.user.id,
+        },
+      })
+
+      res.json({ message: '비밀번호 변경 요청을 거부했습니다.' })
+    } catch (error) {
+      next(error)
+    }
+  }
+)
+
+// 비밀번호 변경 (기존 비밀번호 또는 관리자 승인)
+router.post(
+  '/reset-password',
+  [
+    body('employeeNumber').trim().notEmpty().withMessage('직원번호를 입력해주세요.'),
+    body('currentPassword').optional({ values: 'falsy' }).isString(),
+    body('newPassword').isLength({ min: 8 }).withMessage('새 비밀번호는 8자 이상이어야 합니다.'),
+  ],
+  async (req, res, next) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ message: errors.array()[0].msg })
+      }
+
+      const { employeeNumber, currentPassword, newPassword } = req.body
+
       const user = await prisma.user.findFirst({
         where: { employeeNumber: employeeNumber.toUpperCase() },
       })
 
-      if (!user) {
-        return res.status(404).json({ message: '해당 직원번호로 등록된 사용자를 찾을 수 없습니다.' })
+      if (!user || user.status !== 'APPROVED') {
+        return res.status(401).json({
+          message: '직원번호 또는 기존 비밀번호가 올바르지 않습니다.',
+        })
       }
 
-      // 비밀번호 암호화
+      let approvedRequest = null
+
+      if (currentPassword) {
+        const passwordOk = await bcrypt.compare(currentPassword, user.password)
+        if (!passwordOk) {
+          return res.status(401).json({
+            message: '직원번호 또는 기존 비밀번호가 올바르지 않습니다.',
+          })
+        }
+        if (currentPassword === newPassword) {
+          return res.status(400).json({
+            message: '새 비밀번호는 기존 비밀번호와 달라야 합니다.',
+          })
+        }
+      } else {
+        approvedRequest = await findActiveApprovedReset(user.id)
+        if (!approvedRequest) {
+          return res.status(403).json({
+            message: '기존 비밀번호를 입력하거나, 관리자 승인 후 변경할 수 있습니다.',
+          })
+        }
+      }
+
       const hashedPassword = await bcrypt.hash(newPassword, 10)
 
-      // 비밀번호 업데이트
       await prisma.user.update({
         where: { id: user.id },
         data: { password: hashedPassword },
       })
+      if (approvedRequest) {
+        await prisma.passwordResetRequest.update({
+          where: { id: approvedRequest.id },
+          data: { status: 'USED' },
+        })
+      }
 
-      res.json({ message: '비밀번호가 성공적으로 재설정되었습니다.' })
+      res.json({ message: '비밀번호가 성공적으로 변경되었습니다.' })
     } catch (error) {
       next(error)
     }

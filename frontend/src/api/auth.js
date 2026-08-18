@@ -65,9 +65,42 @@ export const authAPI = {
     return response.data
   },
 
-  // 비밀번호 재설정
-  resetPassword: async (employeeNumber, newPassword) => {
-    const response = await api.post('/auth/reset-password', { employeeNumber, newPassword })
+  // 비밀번호 변경 상태
+  getPasswordResetStatus: async (employeeNumber) => {
+    const response = await api.get('/auth/password-reset-status', {
+      params: { employeeNumber },
+    })
+    return response.data
+  },
+
+  requestPasswordReset: async (employeeNumber, name) => {
+    const response = await api.post('/auth/password-reset-requests', {
+      employeeNumber,
+      name,
+    })
+    return response.data
+  },
+
+  getPasswordResetRequests: async () => {
+    const response = await api.get('/auth/password-reset-requests')
+    return response.data
+  },
+
+  approvePasswordReset: async (id) => {
+    const response = await api.post(`/auth/password-reset-requests/${id}/approve`)
+    return response.data
+  },
+
+  rejectPasswordReset: async (id) => {
+    const response = await api.post(`/auth/password-reset-requests/${id}/reject`)
+    return response.data
+  },
+
+  // 비밀번호 변경 (기존 비밀번호 또는 관리자 승인)
+  resetPassword: async (employeeNumber, newPassword, currentPassword = null) => {
+    const payload = { employeeNumber, newPassword }
+    if (currentPassword) payload.currentPassword = currentPassword
+    const response = await api.post('/auth/reset-password', payload)
     return response.data
   },
 }

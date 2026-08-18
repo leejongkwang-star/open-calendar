@@ -32,6 +32,8 @@ model User {
   createdTeams    Team[]    @relation("TeamCreator")
   gameScores      GameScore[]
   fastingSessions FastingSession[]
+  passwordResetRequests PasswordResetRequest[] @relation("PasswordResetUser")
+  reviewedPasswordResets PasswordResetRequest[] @relation("PasswordResetReviewer")
 
   @@index([employeeNumber])
   @@index([status])
@@ -47,6 +49,32 @@ enum UserStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+enum PasswordResetStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  USED
+}
+
+model PasswordResetRequest {
+  id          Int                  @id @default(autoincrement())
+  userId      Int
+  status      PasswordResetStatus  @default(PENDING)
+  requestedAt DateTime             @default(now())
+  reviewedAt  DateTime?
+  reviewedBy  Int?
+  expiresAt   DateTime?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  user        User                 @relation("PasswordResetUser", fields: [userId], references: [id], onDelete: Cascade)
+  reviewer    User?                @relation("PasswordResetReviewer", fields: [reviewedBy], references: [id])
+
+  @@index([userId, status])
+  @@index([status])
+  @@map("password_reset_requests")
 }
 
 // 팀 모델

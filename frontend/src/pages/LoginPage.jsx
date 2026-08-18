@@ -182,7 +182,7 @@ function LoginPage() {
                 onClick={() => setShowForgotPassword(true)}
                 className="text-sm text-primary-600 hover:text-primary-700"
               >
-                비밀번호 찾기
+                비밀번호 변경
               </button>
             </div>
 
@@ -206,7 +206,7 @@ function LoginPage() {
         </div>
       </div>
 
-      {/* 비밀번호 찾기 모달 */}
+      {/* 비밀번호 변경 모달 */}
       <ForgotPasswordModal
         isOpen={showForgotPassword}
         onClose={() => setShowForgotPassword(false)}

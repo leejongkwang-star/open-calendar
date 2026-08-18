@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Users, Shield, Search, X, CheckCircle, XCircle, Clock, UserCog } from 'lucide-react'
+import { Plus, Edit, Trash2, Users, Shield, Search, X, CheckCircle, XCircle, Clock, UserCog, KeyRound } from 'lucide-react'
 import { teamsAPI } from '../api/teams'
 import { authAPI } from '../api/auth'
 import { useAuthStore } from '../store/authStore'
@@ -8,11 +8,12 @@ import MemberModal from '../components/MemberModal'
 
 function AdminPage() {
   const { user } = useAuthStore()
-  const [activeTab, setActiveTab] = useState('approval') // 'approval', 'users', 'teams'
+  const [activeTab, setActiveTab] = useState('approval') // 'approval', 'password-reset', 'users', 'teams'
   const [teams, setTeams] = useState([])
   const [selectedTeam, setSelectedTeam] = useState(null)
   const [members, setMembers] = useState([])
   const [pendingUsers, setPendingUsers] = useState([])
+  const [passwordResetRequests, setPasswordResetRequests] = useState([])
   const [allUsers, setAllUsers] = useState([])
   const [showTeamModal, setShowTeamModal] = useState(false)
   const [showMemberModal, setShowMemberModal] = useState(false)
@@ -33,6 +34,7 @@ function AdminPage() {
   useEffect(() => {
     // Mock 데이터 로드 제거 - 실제 API 사용
     loadPendingUsers()
+    loadPasswordResetRequests()
     loadTeams()
     if (activeTab === 'users') {
       loadAllUsers()
@@ -58,6 +60,16 @@ function AdminPage() {
         const errorMessage = error.response?.data?.message || error.message || '승인 대기 사용자 목록을 불러오는데 실패했습니다.'
         alert(`승인 대기 사용자 목록을 불러오는데 실패했습니다.\n\n${errorMessage}`)
       }
+    }
+  }
+
+  const loadPasswordResetRequests = async () => {
+    try {
+      const data = await authAPI.getPasswordResetRequests()
+      setPasswordResetRequests(data || [])
+    } catch (error) {
+      console.error('비밀번호 변경 요청 로드 실패:', error)
+      setPasswordResetRequests([])
     }
   }
 
@@ -102,6 +114,34 @@ function AdminPage() {
         const errorMessage = error.response?.data?.message || error.message || '구성원 목록을 불러오는데 실패했습니다.'
         alert(`구성원 목록을 불러오는데 실패했습니다.\n\n${errorMessage}`)
       }
+    }
+  }
+
+  const handleApprovePasswordReset = async (id) => {
+    if (!window.confirm('이 비밀번호 변경 요청을 승인하시겠습니까? 승인 후 24시간 동안 새 비밀번호를 설정할 수 있습니다.')) {
+      return
+    }
+    try {
+      await authAPI.approvePasswordReset(id)
+      loadPasswordResetRequests()
+      alert('비밀번호 변경 요청을 승인했습니다.')
+    } catch (error) {
+      console.error('비밀번호 변경 승인 실패:', error)
+      alert(error.response?.data?.message || '승인 처리에 실패했습니다.')
+    }
+  }
+
+  const handleRejectPasswordReset = async (id) => {
+    if (!window.confirm('이 비밀번호 변경 요청을 거부하시겠습니까?')) {
+      return
+    }
+    try {
+      await authAPI.rejectPasswordReset(id)
+      loadPasswordResetRequests()
+      alert('비밀번호 변경 요청을 거부했습니다.')
+    } catch (error) {
+      console.error('비밀번호 변경 거부 실패:', error)
+      alert(error.response?.data?.message || '거부 처리에 실패했습니다.')
     }
   }
 
@@ -312,7 +352,7 @@ function AdminPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">관리자</h1>
-        <p className="text-sm text-gray-600 mt-1">회원가입 승인 및 팀 관리를 하세요</p>
+        <p className="text-sm text-gray-600 mt-1">회원가입 승인, 비밀번호 변경 요청, 팀 관리를 하세요</p>
       </div>
 
       {/* 탭 메뉴 */}
@@ -332,6 +372,24 @@ function AdminPage() {
               {pendingUsers.length > 0 && (
                 <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-2 py-0.5">
                   {pendingUsers.length}
+                </span>
+              )}
+            </div>
+          </button>
+          <button
+            onClick={() => setActiveTab('password-reset')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'password-reset'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <div className="flex items-center">
+              <KeyRound className="w-4 h-4 mr-2" />
+              비밀번호 변경
+              {passwordResetRequests.filter((r) => r.status === 'PENDING').length > 0 && (
+                <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-2 py-0.5">
+                  {passwordResetRequests.filter((r) => r.status === 'PENDING').length}
                 </span>
               )}
             </div>
@@ -426,6 +484,74 @@ function AdminPage() {
                             거부
                           </button>
                         </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'password-reset' && (
+        <div className="card">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">비밀번호 변경 요청</h2>
+            <p className="text-sm text-gray-600 mt-1">
+              승인하면 해당 회원이 24시간 안에 새 비밀번호를 설정할 수 있습니다.
+            </p>
+          </div>
+
+          {passwordResetRequests.length === 0 ? (
+            <div className="text-center py-12">
+              <KeyRound className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500">처리할 비밀번호 변경 요청이 없습니다.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">이름</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">직원번호</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">상태</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">요청일</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">작업</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {passwordResetRequests.map((item) => (
+                    <tr key={item.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm text-gray-900">{item.name}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 font-mono">{item.employeeNumber}</td>
+                      <td className="px-4 py-3 text-sm">
+                        {item.status === 'PENDING' ? (
+                          <span className="text-amber-700">대기</span>
+                        ) : (
+                          <span className="text-green-700">승인됨 (변경 대기)</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{formatDate(item.requestedAt)}</td>
+                      <td className="px-4 py-3 text-right">
+                        {item.status === 'PENDING' && (
+                          <div className="flex justify-end gap-2">
+                            <button
+                              onClick={() => handleApprovePasswordReset(item.id)}
+                              className="btn-primary flex items-center text-sm"
+                            >
+                              <CheckCircle className="w-4 h-4 mr-1" />
+                              승인
+                            </button>
+                            <button
+                              onClick={() => handleRejectPasswordReset(item.id)}
+                              className="btn-secondary flex items-center text-sm bg-red-50 text-red-700 hover:bg-red-100"
+                            >
+                              <XCircle className="w-4 h-4 mr-1" />
+                              거부
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}
