@@ -33,8 +33,8 @@ DB가 2개가 되므로 스키마 이력을 Prisma 마이그레이션으로 관�
 ```bash
 cd backend
 
-# 카드운영부 DB 의 직접 연결(5432) 문자열을 넣는다
-export DIRECT_DATABASE_URL="postgresql://postgres:[비밀번호]@db.[카드운영부-REF].supabase.co:5432/postgres"
+# 기존 DATABASE_URL 의 포트만 5432 로 바꾼 값을 넣는다
+export DIRECT_DATABASE_URL="postgresql://postgres.[카드운영부-REF]:[비밀번호]@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres"
 
 npx prisma migrate resolve --applied 0_init
 npm run db:status   # "Database schema is up to date" 확인
@@ -58,9 +58,21 @@ npx prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schem
 | 용도 | 위치 | 포트 |
 |------|------|------|
 | 런타임 (`DATABASE_URL`) | Connection string → **Transaction pooler** | 6543 |
-| 마이그레이션 (`DIRECT_DATABASE_URL`) | Connection string → **Direct connection** | 5432 |
+| 마이그레이션 (`DIRECT_DATABASE_URL`) | Connection string → **Session pooler** | 5432 |
 
-풀러(6543)로 마이그레이션을 실행하면 멈추는 사례가 있어, 스키마 작업은 항상 직접 연결(5432)을 씁니다.
+두 문자열은 **포트만 다릅니다**(6543 → 5432). 호스트와 사용자명은 동일하므로,
+런타임 URL 의 포트만 바꿔 쓰면 됩니다.
+
+```
+# 런타임
+postgresql://postgres.[REF]:[비밀번호]@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres
+# 마이그레이션 (포트만 5432)
+postgresql://postgres.[REF]:[비밀번호]@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres
+```
+
+트랜잭션 모드(6543)는 prepared statement 를 지원하지 않아 마이그레이션이 멈출 수 있고,
+세션 모드(5432)는 일반 Postgres 연결처럼 동작해 DDL 에 적합합니다.
+`db.[REF].supabase.co` 형태의 Direct connection 도 쓸 수 있지만 IPv6 전용인 경우가 있어 세션 풀러를 권장합니다.
 이 분리는 [prisma/schema.prisma](prisma/schema.prisma)의 `directUrl` 설정으로 처리됩니다.
 
 ## 2. 신규 DB에 스키마 적용
@@ -75,7 +87,7 @@ npm run db:deploy   # prisma migrate deploy
 npm run db:status
 ```
 
-적용 후 확인 (테이블 8개, `GameType`에 `GALAGA` 포함):
+적용 후 확인 (테이블 7개, `GameType`에 `GALAGA` 포함):
 
 ```bash
 npx prisma studio
