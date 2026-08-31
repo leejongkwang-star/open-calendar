@@ -25,7 +25,10 @@
 | 부서 | Cloud Run | 프론트엔드 |
 |------|-----------|-----------|
 | 카드운영부 | `calendar-backend` | https://open-calendar-frontend.vercel.app |
-| 공통업무지원부 | `calendar-backend-common`<br/>https://calendar-backend-common-750665560932.asia-northeast3.run.app | (미생성) |
+| 공통업무지원부 | `calendar-backend-common`<br/>https://calendar-backend-common-750665560932.asia-northeast3.run.app | https://open-calendar-common.vercel.app |
+
+두 부서 모두 Vercel Hobby 플랜에서 동작합니다(프로젝트 200개, 저장소당 25개 한도).
+단 Hobby 는 동시 배포가 1개라 같은 저장소를 쓰는 두 프로젝트가 순차로 빌드됩니다.
 
 서비스명을 바꾸려면 [.github/workflows/deploy-cloud-run.yml](../.github/workflows/deploy-cloud-run.yml)의 `matrix.include`도 함께 수정해야 합니다.
 
