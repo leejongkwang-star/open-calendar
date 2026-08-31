@@ -20,6 +20,13 @@
 | 이미지 | `asia-northeast3-docker.pkg.dev/open-calendar-481005/calendar-backend/calendar-backend` |
 | 신규 서비스명 | `calendar-backend-common` |
 
+## 현재 배포 현황
+
+| 부서 | Cloud Run | 프론트엔드 |
+|------|-----------|-----------|
+| 카드운영부 | `calendar-backend` | https://open-calendar-frontend.vercel.app |
+| 공통업무지원부 | `calendar-backend-common`<br/>https://calendar-backend-common-750665560932.asia-northeast3.run.app | (미생성) |
+
 서비스명을 바꾸려면 [.github/workflows/deploy-cloud-run.yml](../.github/workflows/deploy-cloud-run.yml)의 `matrix.include`도 함께 수정해야 합니다.
 
 ---
@@ -72,7 +79,11 @@ postgresql://postgres.[REF]:[비밀번호]@aws-1-ap-northeast-2.pooler.supabase.
 
 트랜잭션 모드(6543)는 prepared statement 를 지원하지 않아 마이그레이션이 멈출 수 있고,
 세션 모드(5432)는 일반 Postgres 연결처럼 동작해 DDL 에 적합합니다.
-`db.[REF].supabase.co` 형태의 Direct connection 도 쓸 수 있지만 IPv6 전용인 경우가 있어 세션 풀러를 권장합니다.
+`db.[REF].supabase.co` 형태의 Direct connection 은 최근 생성한 프로젝트에서 **DNS 에 아예 없는 경우가 있습니다**
+(A/AAAA 레코드 모두 없음). 세션 풀러를 쓰면 이 문제를 피할 수 있습니다.
+
+리전 풀러 접두어(`aws-0` / `aws-1`)는 **프로젝트마다 다릅니다.** 같은 서울 리전이라도 다를 수 있으니
+Supabase 화면에 표시된 호스트를 그대로 사용하세요.
 이 분리는 [prisma/schema.prisma](prisma/schema.prisma)의 `directUrl` 설정으로 처리됩니다.
 
 ## 2. 신규 DB에 스키마 적용
@@ -115,8 +126,12 @@ gcloud run deploy calendar-backend-common \
   --memory 512Mi \
   --cpu 1 \
   --timeout 300s \
-  --set-env-vars "NODE_ENV=production,PORT=8080,DATABASE_URL=<공통업무지원부 pooler URL>,JWT_SECRET=${JWT_SECRET},JWT_EXPIRES_IN=1h,CORS_ORIGIN=https://<신규 프론트 도메인>"
+  --set-env-vars "NODE_ENV=production,DATABASE_URL=<공통업무지원부 pooler URL>,JWT_SECRET=${JWT_SECRET},CORS_ORIGIN=https://<신규 프론트 도메인>"
 ```
+
+`PORT` 는 Cloud Run 예약 변수라 `--set-env-vars` 로 지정하면 배포가 거부됩니다.
+런타임 포트는 Cloud Run 이 자동으로 주입하고, [Dockerfile](Dockerfile) 의 기본값(8080)과 일치합니다.
+`JWT_EXPIRES_IN` 을 생략하면 코드 기본값 `7d` 가 적용됩니다.
 
 `CORS_ORIGIN`은 5번에서 프론트 도메인이 확정된 뒤 다시 설정해도 됩니다.
 
