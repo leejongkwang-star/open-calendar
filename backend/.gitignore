@@ -18,7 +18,8 @@ yarn-debug.log*
 yarn-error.log*
 
 # Prisma
-prisma/migrations/
+# prisma/migrations 는 의도적으로 커밋한다.
+# 부서별로 DB 가 여러 개이므로 마이그레이션 이력이 코드와 함께 관리되어야 한다.
 
 # IDE
 .vscode/

@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/authStore'
 import { authAPI } from '../api/auth'
 import { Hash, Lock, AlertCircle } from 'lucide-react'
 import ForgotPasswordModal from '../components/ForgotPasswordModal'
+import { APP_TITLE } from '../utils/branding'
 
 function LoginPage() {
   const [employeeNumber, setEmployeeNumber] = useState('')
@@ -111,7 +112,7 @@ function LoginPage() {
       <div className="max-w-md w-full">
         <div className="card">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">카드운영부 팀캘린더</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">{APP_TITLE}</h1>
             <p className="text-gray-600">로그인하여 일정을 관리하세요</p>
           </div>
 

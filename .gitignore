@@ -25,6 +25,10 @@ Thumbs.db
 *.swp
 *.swo
 
-# Markdown files (except README.md)
+# Markdown files (except README.md 와 운영 문서)
 *.md
 !README.md
+# 부서 신규 개설 절차. deploy-cloud-run.yml 이 이 경로를 참조한다.
+!backend/DEPLOY_NEW_DEPARTMENT.md
+# 프론트엔드 필수 환경변수 정의
+!frontend/ENV_SETUP.md

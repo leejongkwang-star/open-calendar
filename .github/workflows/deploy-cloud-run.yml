@@ -10,13 +10,13 @@ on:
 
 env:
   PROJECT_ID: open-calendar-481005
-  SERVICE_NAME: calendar-backend
   REGION: asia-northeast3
+  IMAGE_NAME: asia-northeast3-docker.pkg.dev/open-calendar-481005/calendar-backend/calendar-backend
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    
+
     permissions:
       contents: read
       id-token: write
@@ -38,21 +38,61 @@ jobs:
 
       - name: Build Docker image
         working-directory: ./backend
-        run: |
-          IMAGE_NAME="asia-northeast3-docker.pkg.dev/${{ env.PROJECT_ID }}/calendar-backend/calendar-backend"
-          docker build -t ${IMAGE_NAME}:${{ github.sha }} -t ${IMAGE_NAME}:latest .
+        run: docker build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} -t ${{ env.IMAGE_NAME }}:latest .
 
       - name: Push Docker image
         run: |
-          IMAGE_NAME="asia-northeast3-docker.pkg.dev/${{ env.PROJECT_ID }}/calendar-backend/calendar-backend"
-          docker push ${IMAGE_NAME}:${{ github.sha }}
-          docker push ${IMAGE_NAME}:latest
+          docker push ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker push ${{ env.IMAGE_NAME }}:latest
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    strategy:
+      # 한 부서 배포가 실패해도 다른 부서 배포는 계속 진행한다.
+      fail-fast: false
+      matrix:
+        include:
+          - department: 카드운영부
+            service: calendar-backend
+          - department: 공통업무지원부
+            service: calendar-backend-common
+
+    name: deploy (${{ matrix.department }})
+
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      # 서비스가 없는 상태로 deploy하면 DATABASE_URL/JWT_SECRET 없이 생성되어 기동 실패한다.
+      # 최초 생성은 backend/DEPLOY_NEW_DEPARTMENT.md 절차로 환경변수와 함께 수행해야 한다.
+      # 아직 개설되지 않은 부서는 경고만 남기고 건너뛴다.
+      - name: Check service exists
+        id: check
+        run: |
+          if gcloud run services describe ${{ matrix.service }} \
+            --region ${{ env.REGION }} --platform managed >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Cloud Run service '${{ matrix.service }}' not found, skipping deploy. See backend/DEPLOY_NEW_DEPARTMENT.md"
+          fi
 
       - name: Deploy to Cloud Run
+        if: steps.check.outputs.exists == 'true'
         run: |
-          IMAGE_NAME="asia-northeast3-docker.pkg.dev/${{ env.PROJECT_ID }}/calendar-backend/calendar-backend"
-          gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image ${IMAGE_NAME}:${{ github.sha }} \
+          gcloud run deploy ${{ matrix.service }} \
+            --image ${{ env.IMAGE_NAME }}:${{ github.sha }} \
             --region ${{ env.REGION }} \
             --platform managed \
             --allow-unauthenticated \
@@ -60,4 +100,3 @@ jobs:
             --cpu 1 \
             --timeout 300s \
             --quiet
-

@@ -11,7 +11,10 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "prisma:seed": "node prisma/seed.js",
-    "sync:roles": "node src/scripts/syncUserTeamRoles.js"
+    "sync:roles": "node src/scripts/syncUserTeamRoles.js",
+    "db:deploy": "prisma migrate deploy",
+    "db:status": "prisma migrate status",
+    "bootstrap:admin": "node scripts/bootstrap-admin.mjs"
   },
   "keywords": [
     "calendar",
@@ -30,6 +33,7 @@
     "express-validator": "^7.0.1"
   },
   "devDependencies": {
+    "pg": "^8.23.0",
     "prisma": "^5.7.1"
   }
 }

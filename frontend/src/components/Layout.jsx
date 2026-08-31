@@ -2,6 +2,7 @@ import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { Calendar, Users, LogOut, Menu, Gamepad2, Sparkles, Clover, Timer } from 'lucide-react'
 import { useState } from 'react'
+import { HEADER_TITLE } from '../utils/branding'
 
 function Layout() {
   const { user, logout } = useAuthStore()
@@ -23,8 +24,8 @@ function Layout() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <Link to="/" className="text-2xl font-bold text-primary-600">
-                팀 캘린더
+              <Link to="/" className="text-xl sm:text-2xl font-bold text-primary-600">
+                {HEADER_TITLE}
               </Link>
             </div>
 
