@@ -1,7 +1,29 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { DEFAULT_DEPT_NAME, ICON_SETS, resolveIconSet, iconPath } from './src/utils/deptIcons.js'
+
+const rootDir = path.dirname(fileURLToPath(import.meta.url))
+
+// iOS 사파리는 link 태그가 없으면 사이트 루트의 /apple-touch-icon.png 를 찾는다.
+// 부서 아이콘을 그 고정 경로로도 내보내, JS 주입에 의존하지 않고도 홈화면 추가가 되게 한다.
+function emitAppleTouchIcon(iconSet) {
+  return {
+    name: 'emit-apple-touch-icon',
+    apply: 'build',
+    generateBundle() {
+      const src = path.resolve(rootDir, `public/icons/${iconSet}/icon-192x192.png`)
+      this.emitFile({
+        type: 'asset',
+        fileName: 'apple-touch-icon.png',
+        source: fs.readFileSync(src),
+      })
+    },
+  }
+}
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -14,6 +36,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       react(),
+      emitAppleTouchIcon(iconSet),
       VitePWA({
         registerType: 'autoUpdate',
         manifest: {
