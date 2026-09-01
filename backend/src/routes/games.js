@@ -28,6 +28,9 @@ const GAME_SORT_ORDER = {
   GALAGA: 'desc', // 높은 점수가 좋음
 }
 
+// 반응속도 기록으로 인정하는 최소 시간(초)
+const MIN_REACTION_SECONDS = 0.1
+
 // 점수 저장 (인증 필요)
 router.post(
   '/scores',
@@ -51,6 +54,12 @@ router.post(
 
       const { gameType, score, metadata } = req.body
       const userId = req.user.id
+
+      // 사람의 단순 반응 속도 하한은 대략 0.15초다. 그보다 빠른 기록은 대기 화면 연타나
+      // API 직접 호출로만 나올 수 있으므로 거부한다.
+      if (gameType === 'REACTION' && score < MIN_REACTION_SECONDS) {
+        return res.status(400).json({ message: '유효하지 않은 기록입니다.' })
+      }
 
       // 기존 최고 기록 조회
       const existingScore = await prisma.gameScore.findUnique({
