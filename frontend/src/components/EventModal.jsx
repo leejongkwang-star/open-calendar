@@ -257,7 +257,7 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, sele
                 onChange={(e) => {
                   const newStartDate = e.target.value
                   // 시작일 변경 시 종료일이 시작일보다 이전이면 종료일도 동일하게 설정
-                  const newEndDate = newStartDate < formData.endDate ? newStartDate : formData.endDate
+                  const newEndDate = formData.endDate < newStartDate ? newStartDate : formData.endDate
                   
                   // 날짜가 변경되면 시간 재설정
                   let newStartTime = formData.startTime
