@@ -145,10 +145,11 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, sele
       }
     } else {
       // event가 없는 경우 (직접 모달 열기)
+      // 날짜를 클릭해 여는 경우와 기본 시간을 맞춘다 (종일 09:00-18:00)
       const today = new Date()
       const startDateStr = formatDate(today)
       const startTime = '09:00'
-      const endTime = addOneHour(startTime)
+      const endTime = '18:00'
       
       setOwnerName(currentUser?.name || '')
       setFormData({
@@ -258,32 +259,7 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, sele
                   const newStartDate = e.target.value
                   // 시작일 변경 시 종료일이 시작일보다 이전이면 종료일도 동일하게 설정
                   const newEndDate = formData.endDate < newStartDate ? newStartDate : formData.endDate
-                  
-                  // 날짜가 변경되면 시간 재설정
-                  let newStartTime = formData.startTime
-                  let newEndTime = formData.endTime
-                  
-                  if (newStartDate !== newEndDate) {
-                    // 여러 날짜 일정: 시작일 09시, 종료일 18시
-                    newStartTime = '09:00'
-                    newEndTime = '18:00'
-                  } else {
-                    // 하루 일정: 등록 시간을 시작시간으로, +1시간을 종료시간으로
-                    const now = new Date()
-                    const currentHour = String(now.getHours()).padStart(2, '0')
-                    const currentMinute = String(now.getMinutes()).padStart(2, '0')
-                    const currentTime = `${currentHour}:${currentMinute}`
-                    newStartTime = currentTime
-                    newEndTime = addOneHour(currentTime)
-                  }
-                  
-                  setFormData({ 
-                    ...formData, 
-                    startDate: newStartDate, 
-                    endDate: newEndDate,
-                    startTime: newStartTime,
-                    endTime: newEndTime,
-                  })
+                  setFormData({ ...formData, startDate: newStartDate, endDate: newEndDate })
                 }}
                 className="input-field"
                 required
@@ -297,31 +273,7 @@ function EventModal({ event, onClose, onSave, onDelete, currentUser, teams, sele
                 type="date"
                 value={formData.endDate}
                 onChange={(e) => {
-                  const newEndDate = e.target.value
-                  // 종료일 변경 시: 시작일과 다른 날이면 시간 자동 설정 (여러 날짜 일정)
-                  let newStartTime = formData.startTime
-                  let newEndTime = formData.endTime
-                  
-                  if (newEndDate !== formData.startDate) {
-                    // 여러 날짜 일정: 시작일 09시, 종료일 18시
-                    newStartTime = '09:00'
-                    newEndTime = '18:00'
-                  } else {
-                    // 하루 일정으로 변경: 등록 시간을 시작시간으로, +1시간을 종료시간으로
-                    const now = new Date()
-                    const currentHour = String(now.getHours()).padStart(2, '0')
-                    const currentMinute = String(now.getMinutes()).padStart(2, '0')
-                    const currentTime = `${currentHour}:${currentMinute}`
-                    newStartTime = currentTime
-                    newEndTime = addOneHour(currentTime)
-                  }
-                  
-                  setFormData({ 
-                    ...formData, 
-                    endDate: newEndDate,
-                    startTime: newStartTime,
-                    endTime: newEndTime,
-                  })
+                  setFormData({ ...formData, endDate: e.target.value })
                 }}
                 min={formData.startDate}
                 className="input-field"
